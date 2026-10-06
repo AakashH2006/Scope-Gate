@@ -51,17 +51,31 @@ Repo: https://github.com/AakashH2006/Scope-Gate (public)
 - Admin sessions and the rate limiter are **in-memory → single process only**.
 - The link and password still travel in the same email (README §16, open).
 
-## Known gaps, roughly in priority order
+## What is left, in priority order
 
-1. AWS deployment never run. Watch for: EC2 blocks outbound port 25 (use 587);
-   SES starts in sandbox and only delivers to verified addresses; Gmail needs
-   an app password and rewrites `From` to `SMTP_USER`.
-2. **Mail has no retries** — one attempt, then an `email_failed` audit row. A
-   transient failure means the vendor never gets the link.
-3. Single process (see above). Multiple workers would break sessions, the rate
-   limiter and the expiry job.
-4. One admin, no roles. `/admin` shares a hostname with vendor routes.
-5. No LICENSE — a public repo without one is all rights reserved.
+1. **AWS deployment — the only unfinished build step.** `deploy/` is written
+   but has never been executed. Needs the AWS CLI installed and `aws configure`
+   run *by the user*; it takes access keys Claude should not handle. Traps:
+   EC2 blocks outbound port 25, so use 587; SES starts in sandbox and silently
+   delivers only to **verified** addresses; Gmail needs an app password (not
+   the account password) and rewrites `From` to match `SMTP_USER`.
+2. **Mail has no retries.** One attempt, then an `email_failed` audit row, and
+   the vendor silently never gets their link. Roughly 40 lines plus tests.
+   Worth doing *before* deploying — it is the gap most likely to embarrass a
+   live demo. A resend button on the dashboard would pair with it.
+3. **Single process.** Admin sessions, the login rate limiter and the expiry
+   job are all in memory, so a second uvicorn worker breaks all three. Fine for
+   a demo; the first thing to fix if anyone asks about load.
+4. **The ScopeGate rename.** Interface and deck say ScopeGate; the package
+   directory, config prefixes, CLI, email copy and systemd units still say
+   vendorgate. One mechanical commit (see Naming above).
+5. Smaller: no LICENSE (a public repo without one is all rights reserved); one
+   admin with no roles; `/admin` shares a hostname with the vendor routes.
+
+## Open questions, not yet decided
+
+- Do the mail retries before the AWS deployment, or deploy first?
+- Rename the codebase to ScopeGate now, or leave it until after the demo?
 
 ## The deck
 
