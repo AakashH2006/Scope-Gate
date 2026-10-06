@@ -78,6 +78,10 @@ class Settings:
     max_request_bytes: int = 1_048_576
     upstream_timeout_seconds: int = 20
     inject_banner: bool = True
+    #: What to do with links in a proxied page that point somewhere the grant
+    #: does not cover: ``remove`` them, ``disable`` them (visible, dead) or
+    #: ``keep`` them. Defence in depth only -- the allowlist is the control.
+    blocked_links: str = "remove"
 
     # --- logging --------------------------------------------------------------
     log_dashboard_days: int = 7
@@ -134,6 +138,7 @@ def build_settings() -> Settings:
         max_request_bytes=_int("MAX_REQUEST_BYTES", 1_048_576),
         upstream_timeout_seconds=_int("UPSTREAM_TIMEOUT_SECONDS", 20),
         inject_banner=_bool("INJECT_BANNER", True),
+        blocked_links=(os.getenv("BLOCKED_LINKS", "remove").strip().lower() or "remove"),
         log_dashboard_days=_int("LOG_DASHBOARD_DAYS", 7),
         log_retention_days=_int("LOG_RETENTION_DAYS", 365),
         mail_backend=os.getenv("MAIL_BACKEND", "file").strip().lower(),

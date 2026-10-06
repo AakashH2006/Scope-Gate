@@ -207,7 +207,7 @@ def run() -> int:
     print(f"  internal site  http://127.0.0.1:{mock_port}  (private)")
     print(f"  scratch        {tmp}")
 
-    with Server(create_mocksite(), mock_port), Server(app, gateway_port) as gw:
+    with Server(create_mocksite(self_url=f'http://127.0.0.1:{mock_port}'), mock_port), Server(app, gateway_port) as gw:
         base = gw.url
         admin = httpx.Client(base_url=base, timeout=30)
         vendor = httpx.Client(base_url=base, timeout=30)

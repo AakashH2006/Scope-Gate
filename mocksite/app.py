@@ -22,7 +22,12 @@ from datetime import datetime, timezone
 from fastapi import FastAPI, Request, Response, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 
-SELF_URL = os.getenv("MOCKSITE_SELF_URL", "http://127.0.0.1:9000")
+#: How this app refers to itself in absolute links.  A real internal site is
+#: reached at exactly the address the gateway has as UPSTREAM_URL, so tests and
+#: the live demo pass that same value in -- otherwise the absolute links it
+#: emits would not match what the gateway rewrites, and the test suite would
+#: only ever exercise the root-relative half of the rewriting.
+DEFAULT_SELF_URL = os.getenv("MOCKSITE_SELF_URL", "http://127.0.0.1:9000")
 
 ALLOWED_DEMO_PAGES = [
     ("/dashboard/overview", "Overview"),
@@ -56,7 +61,7 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: 13px; }
 """
 
 
-def _chrome(active: str) -> str:
+def _chrome(active: str, self_url: str) -> str:
     links = []
     for path, label in ALLOWED_DEMO_PAGES:
         # Root-relative links: the gateway must prefix these with /s.
@@ -65,7 +70,7 @@ def _chrome(active: str) -> str:
     for path, label in LOCKED_DEMO_PAGES:
         # Absolute links to the internal host: the gateway must rewrite the
         # host away, and then block the page itself.
-        links.append(f'<a href="{SELF_URL}{path}">{label}</a>')
+        links.append(f'<a href="{self_url}{path}">{label}</a>')
     return (
         '<div class="top"><b>Acme Internal</b>'
         + "".join(links)
@@ -74,17 +79,18 @@ def _chrome(active: str) -> str:
     )
 
 
-def _page(title: str, active: str, body: str) -> str:
+def _page(title: str, active: str, body: str, self_url: str) -> str:
     return (
         "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">"
         '<meta name="viewport" content="width=device-width, initial-scale=1">'
         f"<title>{title} &middot; Acme Internal</title>"
         f"<style>{PAGE_CSS}</style></head><body>"
-        f"{_chrome(active)}<main>{body}</main></body></html>"
+        f"{_chrome(active, self_url)}<main>{body}</main></body></html>"
     )
 
 
-def create_app() -> FastAPI:
+def create_app(self_url: str | None = None) -> FastAPI:
+    SELF_URL = self_url or DEFAULT_SELF_URL
     app = FastAPI(title="Acme Internal (mock)", docs_url=None, redoc_url=None, openapi_url=None)
 
     @app.middleware("http")
@@ -142,7 +148,7 @@ def create_app() -> FastAPI:
         <p class="sub">Try <a href="/dashboard/finance">Finance</a> &mdash; it is not
         part of a vendor grant and the gateway should refuse it.</p>
         """
-        return HTMLResponse(_page("Overview", "/dashboard/overview", body))
+        return HTMLResponse(_page("Overview", "/dashboard/overview", body, SELF_URL))
 
     @app.websocket("/dashboard/overview/ws")
     async def ticker(websocket: WebSocket) -> None:
@@ -177,7 +183,7 @@ def create_app() -> FastAPI:
         <p class="sub">Need the raw numbers? That lives in
         <a href="{SELF_URL}/dashboard/finance">Finance</a>, which vendors cannot open.</p>
         """
-        return HTMLResponse(_page("Reports", "/dashboard/reports", body))
+        return HTMLResponse(_page("Reports", "/dashboard/reports", body, SELF_URL))
 
     @app.get("/dashboard/reports/export.csv")
     async def export_csv() -> Response:
@@ -223,13 +229,13 @@ def create_app() -> FastAPI:
           so this POST should be refused before it ever reaches this app.</p>
         </div>
         """
-        return HTMLResponse(_page("Tickets", "/dashboard/tickets", body))
+        return HTMLResponse(_page("Tickets", "/dashboard/tickets", body, SELF_URL))
 
     @app.post("/dashboard/tickets/comment", response_class=HTMLResponse)
     async def ticket_comment() -> HTMLResponse:
         # Reachable from inside the network; a vendor's POST never gets here.
         return HTMLResponse(
-            _page("Tickets", "/dashboard/tickets", "<h1>Comment saved</h1>")
+            _page("Tickets", "/dashboard/tickets", "<h1>Comment saved</h1>", SELF_URL)
         )
 
     def _locked(title: str, path: str, blurb: str):
@@ -242,7 +248,7 @@ def create_app() -> FastAPI:
               failed. It should never be forwarded.</p>
             </div>
             """
-            return HTMLResponse(_page(title, path, body))
+            return HTMLResponse(_page(title, path, body, SELF_URL))
 
         return view
 

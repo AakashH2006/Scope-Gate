@@ -279,6 +279,80 @@ def rewrite_body(body: bytes, *, upstream_url: str, charset: str = "utf-8") -> b
     return text.encode(charset, errors="replace")
 
 
+#: An anchor with an href, captured so the link can be judged against the grant.
+#: Nesting an <a> inside an <a> is invalid HTML, so the first </a> really is the
+#: matching one and a non-greedy body is safe.
+_ANCHOR_RE = re.compile(
+    r"""<a\b(?P<pre>[^>]*?)href\s*=\s*(?P<q>["'])(?P<url>[^"']*)(?P=q)"""
+    r"""(?P<post>[^>]*)>(?P<inner>.*?)</a\s*>""",
+    re.IGNORECASE | re.DOTALL,
+)
+
+#: A link whose body holds one of these is unwrapped rather than deleted, so a
+#: logo or icon does not vanish along with the link around it.
+_KEEP_INNER_RE = re.compile(r"<(?:img|svg|picture|video)\b", re.IGNORECASE)
+
+BLOCKED_LINK_MODES = ("remove", "disable", "keep")
+
+
+def hide_blocked_links(
+    body: bytes,
+    *,
+    allowed_prefixes: list[str],
+    mode: str = "remove",
+    charset: str = "utf-8",
+) -> bytes:
+    """Take the links a vendor may not follow out of a proxied page.
+
+    The internal site renders its whole navigation, so a vendor granted one
+    page still reads the names of every other one -- "Finance", "Users" --
+    which is information the grant never meant to hand over.
+
+    ``remove``   drop the link and its text entirely (the default)
+    ``disable``  keep the text, drop the href, grey it out
+    ``keep``     leave it alone, and let the allowlist refuse the click
+
+    This is defence in depth and nothing more.  It reduces what a vendor
+    learns and what they click by accident; it is **not** the control.  A
+    vendor who types the path still meets :func:`check_request`, which is
+    where access is actually decided.
+
+    Only absolute ``/s/...`` targets are judged -- that is what
+    :func:`rewrite_body` produces from root-relative and absolute upstream
+    links.  A relative href is left alone, because resolving it needs the
+    current request path and getting that wrong would break a working link.
+    """
+    if mode not in BLOCKED_LINK_MODES or mode == "keep":
+        return body
+    try:
+        text = body.decode(charset, errors="replace")
+    except LookupError:
+        charset = "utf-8"
+        text = body.decode("utf-8", errors="replace")
+
+    def judge(m: re.Match[str]) -> str:
+        url = m.group("url")
+        if not (url == MOUNT or url.startswith(MOUNT + "/")):
+            return m.group(0)  # external, relative, or an anchor/mailto link
+        path = normalise_path(url[len(MOUNT) :] or "/")
+        # Drop a query or fragment before matching the prefix.
+        path = path.split("?", 1)[0].split("#", 1)[0]
+        if path_allowed(path, allowed_prefixes) is not None:
+            return m.group(0)
+        inner = m.group("inner")
+        if mode == "disable":
+            return (
+                '<span style="opacity:.45;cursor:not-allowed" '
+                'title="Not part of your access">' + inner + "</span>"
+            )
+        if _KEEP_INNER_RE.search(inner):
+            # Keep the picture, lose the link.
+            return inner
+        return ""
+
+    return _ANCHOR_RE.sub(judge, text).encode(charset, errors="replace")
+
+
 def rewrite_location(location: str, *, upstream_url: str) -> str:
     """Rewrite a ``Location`` header so a redirect stays inside the gateway.
 

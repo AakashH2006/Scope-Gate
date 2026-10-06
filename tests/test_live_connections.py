@@ -125,7 +125,8 @@ def sign_in_everything(client, app, admin_creds, pages=PAGES, duration_minutes=6
 
 @pytest.fixture
 def live_site():
-    with ThreadedServer(create_mocksite()) as server:
+    port = _free_port()
+    with ThreadedServer(create_mocksite(self_url=f'http://127.0.0.1:{port}'), port) as server:
         yield server
 
 

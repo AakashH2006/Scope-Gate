@@ -143,6 +143,13 @@ Decisions taken while building, that the plan left open:
   rule does the real work.
 - **`Date` and the server banner are stripped** from proxied responses, and the
   gateway does not send its own `Server` header either.
+- **Links outside the grant are removed from proxied pages** (`BLOCKED_LINKS`,
+  default `remove`). The internal site renders its whole navigation, so without
+  this a vendor granted one page still reads the names of every other one --
+  "Finance", "Users", "Settings" -- which the grant never meant to disclose. Set
+  it to `disable` to grey them out instead, or `keep` for the old behaviour.
+  This is defence in depth: the path allowlist is the control, and a vendor who
+  types the URL is refused either way.
 
 ## Open items from the plan
 

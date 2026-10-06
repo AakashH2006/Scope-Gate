@@ -318,9 +318,16 @@ def test_security_headers_are_added_to_proxied_pages(client, vendor_in):
 def test_links_in_the_page_are_rewritten_to_stay_inside_the_gateway(client, vendor_in):
     vendor_in(pages=ALLOWED_PAGES)
     body = client.get(f"/s{ALLOWED_PAGES[0]}").text
+    # Granted pages: linked, and pointing back through the gateway.
     assert 'href="/s/dashboard/reports"' in body
-    assert 'href="/s/dashboard/finance"' in body   # rewritten, and blocked on use
-    assert "http://internal.test" not in body
+    assert 'href="/s/dashboard/tickets"' in body
+    # The internal address never survives, in either link form: the mock site
+    # emits root-relative links for granted pages and absolute ones for the
+    # rest, and both have to come out the other side rewritten.
+    assert "internal.test" not in body
+    # Pages outside the grant are gone entirely (BLOCKED_LINKS=remove).
+    assert 'href="/s/dashboard/finance"' not in body
+    assert "Finance" not in body
 
 
 def test_a_redirect_from_the_internal_site_stays_inside_the_gateway(client, vendor_in):
@@ -538,3 +545,32 @@ def test_retention_prunes_old_events_only(client, issue_grant, settings):
     removed, kept, remaining = asyncio.run(age_and_prune())
     assert removed == 1
     assert remaining == kept
+
+
+# --------------------------------------------------------------------------- #
+# navigation the grant does not cover
+# --------------------------------------------------------------------------- #
+
+def test_vendor_never_sees_the_names_of_pages_outside_the_grant(client, vendor_in):
+    """The mock site renders its whole menu; the gateway must not pass it on."""
+    vendor_in(pages=[ALLOWED_PAGES[0]])
+    body = client.get(f"/s{ALLOWED_PAGES[0]}").text
+
+    # Granted page is still linked.
+    assert f'href="/s{ALLOWED_PAGES[0]}"' in body
+    # Everything else is gone, name and all.
+    for hidden in ("Finance", "Users", "Settings"):
+        assert hidden not in body, hidden
+    for path in ("/dashboard/finance", "/dashboard/users", "/dashboard/settings"):
+        assert f'href="/s{path}"' not in body
+
+
+def test_hiding_links_does_not_replace_the_allowlist(client, vendor_in):
+    """Typing the path directly still meets the server-side check."""
+    grant = vendor_in(pages=[ALLOWED_PAGES[0]])
+    assert "Finance" not in client.get(f"/s{ALLOWED_PAGES[0]}").text
+
+    blocked = client.get("/s/dashboard/finance")
+    assert blocked.status_code == 403
+    assert "Invoices" not in blocked.text
+    assert "page_blocked" in asyncio.run(_event_types(grant.public_id))

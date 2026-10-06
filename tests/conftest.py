@@ -105,7 +105,7 @@ def admin_creds(settings: Settings) -> AdminCreds:
 @pytest.fixture
 def upstream_client() -> httpx.AsyncClient:
     """The mock internal site, reachable only through this in-process client."""
-    mock = create_mocksite()
+    mock = create_mocksite(self_url=UPSTREAM)
     return httpx.AsyncClient(
         transport=httpx.ASGITransport(app=mock),
         base_url=UPSTREAM,

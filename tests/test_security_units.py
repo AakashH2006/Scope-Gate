@@ -260,3 +260,90 @@ def test_rate_limiter_allows_then_blocks():
     assert limiter.retry_after("1.2.3.4") > 0
     limiter.reset("1.2.3.4")
     assert limiter.check("1.2.3.4") is True
+
+
+# --- hiding navigation the grant does not cover ------------------------------ #
+
+NAV = (
+    b'<nav><a href="/"><img src="/logo.png" alt="Acme"></a>'
+    b'<a href="/dashboard/overview">Overview</a>'
+    b'<a href="/dashboard/reports">Reports</a>'
+    b'<a href="http://internal.test/dashboard/finance">Finance</a>'
+    b'<a href="/dashboard/users">Users</a>'
+    b'<a href="https://docs.example/help">Help</a></nav>'
+)
+NAV_ALLOWED = ["/dashboard/overview", "/dashboard/reports"]
+
+
+def _nav(mode):
+    body = proxy.rewrite_body(NAV, upstream_url="http://internal.test")
+    return proxy.hide_blocked_links(
+        body, allowed_prefixes=NAV_ALLOWED, mode=mode
+    ).decode()
+
+
+def test_remove_mode_hides_the_names_of_pages_not_granted():
+    out = _nav("remove")
+    # The point of the mode: the vendor cannot even read what else exists.
+    assert "Finance" not in out
+    assert "Users" not in out
+    assert ">Overview<" in out and ">Reports<" in out
+
+
+def test_remove_mode_keeps_an_image_whose_link_is_blocked():
+    out = _nav("remove")
+    # The logo links to "/", which is not granted -- keep the picture, drop
+    # the link, so the page does not visibly fall apart.
+    assert '<img src="/s/logo.png" alt="Acme">' in out
+    assert '<a href="/s/"' not in out
+
+
+def test_disable_mode_leaves_the_text_but_kills_the_link():
+    out = _nav("disable")
+    assert "Finance" in out
+    assert 'href="/s/dashboard/finance"' not in out
+    assert "not-allowed" in out
+
+
+def test_keep_mode_is_the_old_behaviour():
+    out = _nav("keep")
+    assert 'href="/s/dashboard/finance"' in out
+
+
+def test_external_links_are_never_touched():
+    for mode in ("remove", "disable", "keep"):
+        assert 'href="https://docs.example/help"' in _nav(mode)
+
+
+def test_a_granted_sub_path_with_a_query_survives():
+    body = b'<a href="/dashboard/reports/q3?page=2">Q3</a>'
+    out = proxy.hide_blocked_links(
+        proxy.rewrite_body(body, upstream_url="http://internal.test"),
+        allowed_prefixes=NAV_ALLOWED,
+        mode="remove",
+    ).decode()
+    assert 'href="/s/dashboard/reports/q3?page=2"' in out
+
+
+def test_traversal_in_a_link_is_judged_after_normalising():
+    body = b'<a href="/dashboard/reports/../finance">sneaky</a>'
+    out = proxy.hide_blocked_links(
+        proxy.rewrite_body(body, upstream_url="http://internal.test"),
+        allowed_prefixes=NAV_ALLOWED,
+        mode="remove",
+    ).decode()
+    assert "sneaky" not in out
+
+
+def test_hiding_links_is_not_the_access_control(settings):
+    """The mode changes what is shown, never what is permitted."""
+    from dataclasses import replace
+
+    for mode in ("remove", "disable", "keep"):
+        with pytest.raises(proxy.ProxyDenied):
+            proxy.check_request(
+                method="GET",
+                path="/dashboard/finance",
+                allowed_prefixes=NAV_ALLOWED,
+                settings=replace(settings, blocked_links=mode),
+            )

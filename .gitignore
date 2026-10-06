@@ -11,3 +11,7 @@ outbox/
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Local credential notes - never commit these
+*.local.txt
+*.local.md

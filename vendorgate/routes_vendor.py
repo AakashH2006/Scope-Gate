@@ -306,6 +306,7 @@ async def proxy_request(request: Request, upstream_path: str) -> Response:
         grant_id=grant_id,
         csrf_token=csrf_token,
         seconds_left=seconds_left,
+        allowed_paths=allowed,
     )
 
 
@@ -317,6 +318,7 @@ async def _forward(
     grant_id: int,
     csrf_token: str,
     seconds_left: int,
+    allowed_paths: list[str],
 ) -> Response:
     """Send the request upstream and sanitise what comes back."""
     client: httpx.AsyncClient = request.app.state.upstream
@@ -368,8 +370,17 @@ async def _forward(
             await upstream.aclose()
         charset = proxy.response_charset(content_type)
         out = proxy.rewrite_body(raw, upstream_url=settings.upstream_url, charset=charset)
-        if settings.inject_banner and proxy.is_html(content_type):
-            out = proxy.inject_banner(out, csrf_token=csrf_token, charset=charset)
+        if proxy.is_html(content_type):
+            # Take out the navigation the grant does not cover, before the
+            # banner is added, so the banner's own controls are never judged.
+            out = proxy.hide_blocked_links(
+                out,
+                allowed_prefixes=allowed_paths,
+                mode=settings.blocked_links,
+                charset=charset,
+            )
+            if settings.inject_banner:
+                out = proxy.inject_banner(out, csrf_token=csrf_token, charset=charset)
         out_headers["X-VendorGate-Seconds-Left"] = str(seconds_left)
         return Response(
             content=out,

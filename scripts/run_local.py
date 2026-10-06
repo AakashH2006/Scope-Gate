@@ -37,7 +37,8 @@ async def main() -> None:
 
     mock = uvicorn.Server(
         uvicorn.Config(
-            create_mocksite(), host="127.0.0.1", port=9000, log_level="warning",
+            create_mocksite(self_url=settings.upstream_url),
+            host="127.0.0.1", port=9000, log_level="warning",
             access_log=False,
         )
     )
