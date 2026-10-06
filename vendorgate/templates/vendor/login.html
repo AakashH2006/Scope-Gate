@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Sign in &middot; Temporary access{% endblock %}
+{% block wrapclass %}narrow{% endblock %}
+{% block content %}
+<h1>Temporary access</h1>
+<p class="lede">Sign in with the email address this link was sent to and the password from the same message.</p>
+
+{% if error %}<div class="flash err">{{ error }}</div>{% endif %}
+
+<div class="card">
+  <form method="post" action="/{{ token }}/login" autocomplete="off">
+    <label for="email">Email address</label>
+    <input id="email" name="email" type="email" required autofocus autocomplete="username"
+           value="{{ email or '' }}">
+
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" required autocomplete="one-time-code">
+
+    <div class="actions"><button type="submit">Sign in</button></div>
+  </form>
+</div>
+
+<footer class="foot">
+  Your access window starts when you sign in, and this link works on one device only.
+</footer>
+{% endblock %}

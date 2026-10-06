@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.db
+*.db-journal
+*.sqlite3
+.env
+mail.env
+outbox/
+.pytest_cache/
+.coverage
+htmlcov/

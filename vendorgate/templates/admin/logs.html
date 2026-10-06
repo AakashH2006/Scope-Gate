@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Logs &middot; VendorGate{% endblock %}
+{% block chrome %}{% include "admin/_chrome.html" %}{% endblock %}
+{% block content %}
+
+<h1>Logs</h1>
+<p class="lede">Last {{ log_dashboard_days }} days, newest first. All times UTC.</p>
+
+<div class="card">
+  <form method="get" action="/admin/logs" class="filters">
+    <div>
+      <label for="type">Event</label>
+      <select id="type" name="type">
+        <option value="">all</option>
+        {% for t in event_types %}
+          <option value="{{ t }}" {{ 'selected' if t == type_filter else '' }}>{{ t }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="actor">Actor</label>
+      <select id="actor" name="actor">
+        <option value="">all</option>
+        {% for a in ['admin', 'vendor', 'system'] %}
+          <option value="{{ a }}" {{ 'selected' if a == actor_filter else '' }}>{{ a }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="grant">Grant id</label>
+      <input id="grant" name="grant" type="text" value="{{ grant_filter or '' }}" placeholder="g-XXXXXX">
+    </div>
+    <div style="min-width:auto">
+      <button type="submit">Filter</button>
+    </div>
+    <div style="min-width:auto">
+      <a class="btn ghost" href="/admin/logs">Clear</a>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+{% if events %}
+<div class="scroll">
+<table>
+  <thead><tr><th>When</th><th>Grant</th><th>Actor</th><th>Event</th><th>Detail</th><th>From</th><th>Device</th></tr></thead>
+  <tbody>
+  {% for e in events %}
+    <tr>
+      <td class="mono">{{ e.when }}</td>
+      <td class="mono">{{ e.event.grant_public_id or '' }}</td>
+      <td>{{ e.event.actor }}</td>
+      <td class="mono">{{ e.event.type }}</td>
+      <td>{{ e.event.detail or '' }}</td>
+      <td class="mono">{{ e.event.ip or '' }}</td>
+      <td class="hint" style="max-width:260px">{{ e.event.user_agent or '' }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+<p class="hint">{{ events|length }} row(s) shown{% if truncated %} (limit reached &mdash; narrow the filter){% endif %}.</p>
+{% else %}
+<p class="empty">No events match.</p>
+{% endif %}
+</div>
+
+<footer class="foot">
+  Logs hold vendor email addresses and IP addresses. Retention:
+  {{ log_retention_days }} days in the database.
+</footer>
+{% endblock %}

@@ -1,0 +1,8 @@
+# Keep line endings stable across Windows and Linux checkouts: the gateway is
+# developed on Windows and deployed on Linux.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.woff2 binary
+*.db binary

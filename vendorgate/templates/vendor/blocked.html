@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Not allowed{% endblock %}
+{% block wrapclass %}narrow{% endblock %}
+{% block content %}
+<h1>Not allowed for your access</h1>
+<p class="lede">{{ reason }}</p>
+<div class="card">
+  <p style="margin:0 0 10px">Your access covers these pages:</p>
+  <div class="secretbox">{% for p in allowed_paths %}{{ p }}<br>{% endfor %}</div>
+  {% if first_page %}
+  <div class="actions"><a class="btn" href="/s{{ first_page }}">Back to your pages</a></div>
+  {% endif %}
+</div>
+<footer class="foot">This attempt has been logged.</footer>
+{% endblock %}

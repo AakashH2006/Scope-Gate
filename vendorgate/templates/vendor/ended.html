@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Access ended{% endblock %}
+{% block wrapclass %}narrow{% endblock %}
+{% block content %}
+<h1>Your access has ended</h1>
+<p class="lede">{{ reason }}</p>
+<div class="card">
+  <p style="margin:0">
+    The link cannot be used again. If you still need access, ask the person who
+    arranged it for a new link.
+  </p>
+</div>
+{% endblock %}

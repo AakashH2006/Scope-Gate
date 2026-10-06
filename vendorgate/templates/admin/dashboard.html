@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% block title %}Grants &middot; VendorGate{% endblock %}
+{% block chrome %}{% include "admin/_chrome.html" %}{% endblock %}
+{% block content %}
+
+<h1>Grants</h1>
+<p class="lede">
+  Upstream: <span class="mono">{{ upstream_url }}</span> &middot;
+  link window {{ link_ttl_minutes }} min &middot;
+  read-only ({{ allowed_methods|join(', ') }})
+</p>
+
+{% if error %}<div class="flash err">{{ error }}</div>{% endif %}
+{% if notice %}<div class="flash ok">{{ notice }}</div>{% endif %}
+
+{% if issued %}
+<div class="card">
+  <h2>Grant {{ issued.public_id }} created</h2>
+  <p class="hint">
+    The link and password were emailed to <strong>{{ issued.vendor_email }}</strong>
+    ({{ issued.mail_detail }}). They are shown once here so you can read them out if
+    the mail is slow &mdash; they are not stored and will not appear again.
+  </p>
+  <label>Link</label>
+  <div class="secretbox">{{ issued.link }}</div>
+  <label>Password</label>
+  <div class="secretbox">{{ issued.password }}</div>
+</div>
+{% endif %}
+
+<div class="grid2">
+  <div class="card">
+    <h2>New grant</h2>
+    <form method="post" action="/admin/grants" autocomplete="off">
+      <input type="hidden" name="csrf" value="{{ csrf_token }}">
+
+      <label for="vendor_email">Vendor email</label>
+      <input id="vendor_email" name="vendor_email" type="email" required
+             placeholder="name@vendor.example">
+
+      <label for="duration_minutes">Access duration (minutes)</label>
+      <input id="duration_minutes" name="duration_minutes" type="number" min="1"
+             max="{{ max_access_minutes }}" value="120" required>
+      <div class="hint">Starts at the vendor's first successful sign-in. Maximum
+        {{ max_access_minutes }} minutes.</div>
+
+      <label>Allowed pages</label>
+      {% for page_path in allowed_pages %}
+        <label class="inline">
+          <input type="checkbox" name="allowed_paths" value="{{ page_path }}" checked>
+          <span class="mono">{{ page_path }}</span>
+        </label>
+      {% endfor %}
+
+      <label for="master_password">Confirm your password</label>
+      <input id="master_password" name="master_password" type="password" required
+             autocomplete="current-password">
+      <div class="hint">Required for every grant, even in an open session.</div>
+
+      <div class="actions">
+        <button type="submit">Create grant and send email</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>At a glance</h2>
+    <table>
+      <tr><th>Active now</th><td>{{ counts.active }}</td></tr>
+      <tr><th>Awaiting first sign-in</th><td>{{ counts.pending }}</td></tr>
+      <tr><th>Locked</th><td>{{ counts.locked }}</td></tr>
+      <tr><th>Finished (expired / revoked)</th><td>{{ counts.finished }}</td></tr>
+      <tr><th>Live connections</th><td>{{ live_connections }}</td></tr>
+    </table>
+    {% if counts.locked %}
+      <p class="hint" style="color:var(--bad)">
+        {{ counts.locked }} grant(s) locked by failed sign-in attempts. Issue a new
+        grant if the vendor still needs access.
+      </p>
+    {% endif %}
+    {% if mail_failures %}
+      <p class="hint" style="color:var(--bad)">
+        {{ mail_failures }} email(s) failed to send in the last
+        {{ log_dashboard_days }} days &mdash; see the logs.
+      </p>
+    {% endif %}
+  </div>
+</div>
+
+<h2>All grants</h2>
+<div class="card">
+{% if grants %}
+<div class="scroll">
+<table>
+  <thead>
+    <tr>
+      <th>Grant</th><th>Vendor</th><th>Status</th><th>Time left</th>
+      <th>Pages</th><th>Created</th><th></th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for row in grants %}
+    <tr>
+      <td class="mono">{{ row.grant.public_id }}</td>
+      <td>{{ row.grant.vendor_email }}</td>
+      <td><span class="pill {{ row.grant.status }}">{{ row.grant.status }}</span>
+        {% if row.grant.failed_attempts %}
+          <div class="hint">{{ row.grant.failed_attempts }} failed attempt(s)</div>
+        {% endif %}
+      </td>
+      <td class="mono">{{ row.time_left }}</td>
+      <td class="mono">{% for p in row.grant.allowed_paths %}{{ p }}<br>{% endfor %}</td>
+      <td class="mono">{{ row.created }}</td>
+      <td>
+        {% if not row.grant.is_final %}
+        <form method="post" action="/admin/grants/{{ row.grant.public_id }}/revoke" style="margin:0">
+          <input type="hidden" name="csrf" value="{{ csrf_token }}">
+          <button class="danger" type="submit">Revoke</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<p class="empty">No grants yet.</p>
+{% endif %}
+</div>
+
+<h2>Recent activity</h2>
+<div class="card">
+{% if events %}
+<div class="scroll">
+<table>
+  <thead><tr><th>When</th><th>Grant</th><th>Actor</th><th>Event</th><th>Detail</th><th>From</th></tr></thead>
+  <tbody>
+  {% for e in events %}
+    <tr>
+      <td class="mono">{{ e.when }}</td>
+      <td class="mono">{{ e.event.grant_public_id or '' }}</td>
+      <td>{{ e.event.actor }}</td>
+      <td class="mono">{{ e.event.type }}</td>
+      <td>{{ e.event.detail or '' }}</td>
+      <td class="mono">{{ e.event.ip or '' }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+<p class="hint"><a href="/admin/logs">Full log for the last {{ log_dashboard_days }} days</a></p>
+{% else %}
+<p class="empty">Nothing logged yet.</p>
+{% endif %}
+</div>
+
+<footer class="foot">
+  Dashboard shows {{ log_dashboard_days }} days. The database keeps
+  {{ log_retention_days }} days. All times UTC.
+</footer>
+{% endblock %}

@@ -1,0 +1,46 @@
+# Caddy in front of VendorGate: automatic HTTPS, and the only thing listening
+# on the public interface.  Replace the hostname with your own (a free DuckDNS
+# subdomain is enough for the demo).
+#
+#   sudo cp Caddyfile /etc/caddy/Caddyfile
+#   sudo systemctl reload caddy
+
+myvendorgate.duckdns.org {
+	encode zstd gzip
+
+	# Everything goes to the gateway on loopback.  The mock internal site and
+	# the database are never named here, so they are not reachable from outside.
+	reverse_proxy 127.0.0.1:8000 {
+		header_up X-Forwarded-Proto {scheme}
+		header_up X-Forwarded-Host {host}
+
+		# A vendor may be streaming a download or holding a websocket open.
+		transport http {
+			read_timeout 300s
+			write_timeout 300s
+		}
+	}
+
+	# The gateway sets the rest of its own security headers per response; HSTS
+	# belongs to the front door that terminates TLS.
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+
+	log {
+		output file /var/log/caddy/vendorgate.log {
+			roll_size 20mb
+			roll_keep 10
+		}
+		# Link tokens appear in the request path.  Keeping them out of an
+		# access log is the whole reason the vendor is moved to /s/ after
+		# sign-in; for the pending window, do not log the URI at all.
+		format filter {
+			wrap console
+			fields {
+				request>uri delete
+			}
+		}
+	}
+}

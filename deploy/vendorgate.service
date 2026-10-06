@@ -1,0 +1,39 @@
+[Unit]
+Description=VendorGate restricted vendor access gateway
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=vendorgate
+Group=vendorgate
+WorkingDirectory=/opt/vendorgate
+
+# Secrets live in a file readable only by the service user (section 6.7),
+# never in the repository and never on the command line.
+EnvironmentFile=/etc/vendorgate/vendorgate.env
+ExecStart=/opt/vendorgate/.venv/bin/python -m vendorgate
+
+Restart=always
+RestartSec=2
+
+# The gateway is internet-facing, so give it as little of the machine as it needs.
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+# Only needed when DATABASE_URL points at a local SQLite file:
+ReadWritePaths=/var/lib/vendorgate
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

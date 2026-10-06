@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>{% block title %}VendorGate{% endblock %}</title>
+<link rel="stylesheet" href="/static/app.css">
+<link rel="icon" href="data:,">
+</head>
+<body>
+{% block chrome %}{% endblock %}
+<div class="wrap {% block wrapclass %}{% endblock %}">
+{% block content %}{% endblock %}
+</div>
+</body>
+</html>

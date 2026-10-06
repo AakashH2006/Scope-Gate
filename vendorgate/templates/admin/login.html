@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Admin sign-in &middot; VendorGate{% endblock %}
+{% block wrapclass %}narrow{% endblock %}
+{% block content %}
+<h1>VendorGate admin</h1>
+<p class="lede">Password and authenticator code are both required.</p>
+
+{% if error %}<div class="flash err">{{ error }}</div>{% endif %}
+
+<div class="card">
+  <form method="post" action="/admin/login" autocomplete="off">
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" value="{{ email or '' }}" required autofocus
+           autocomplete="username">
+
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" required autocomplete="current-password">
+
+    <label for="totp">Authenticator code</label>
+    <input id="totp" name="totp" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6"
+           required autocomplete="one-time-code" placeholder="6 digits">
+
+    <div class="actions"><button type="submit">Sign in</button></div>
+  </form>
+</div>
+<footer class="foot">Vendor links are not served from this page.</footer>
+{% endblock %}
