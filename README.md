@@ -1,5 +1,7 @@
 # Vendor Gateway (working name: VendorGate)
 
+[![CI](https://github.com/AakashH2006/Scope-Gate/actions/workflows/ci.yml/badge.svg)](https://github.com/AakashH2006/Scope-Gate/actions/workflows/ci.yml)
+
 A second, restricted gateway that lets an outside vendor use a few specific pages of an internal web application for a limited time, **without ever getting access to the company network**.
 
 > **Status:** planning document for a **demo build**. Everything marked *(later)* is intentionally out of scope for the demo and is listed again in [Future / client version](#15-future--client-version).

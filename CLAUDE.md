@@ -20,6 +20,8 @@ Repo: https://github.com/AakashH2006/Scope-Gate (public)
 
 - Build-plan steps 1–9 and 11 done. **Step 10 (AWS deployment) has never been
   run** — everything in `deploy/` is reviewed-but-untested config.
+- CI runs lint, the 98 tests, the demo script and an `alembic check` on
+  3.12 and 3.13, plus a job that fails if a secret file is ever tracked.
 - 98 tests pass (`python -m pytest`). `python scripts/demo_run.py` walks the
   ten-step demo script over real HTTP: 47/47 checks.
 - Local run: `python scripts/run_local.py` → gateway on :8000, mock site on
@@ -59,7 +61,7 @@ Repo: https://github.com/AakashH2006/Scope-Gate (public)
 3. Single process (see above). Multiple workers would break sessions, the rate
    limiter and the expiry job.
 4. One admin, no roles. `/admin` shares a hostname with vendor routes.
-5. No LICENSE (public repo = all rights reserved), no CI.
+5. No LICENSE — a public repo without one is all rights reserved.
 
 ## The deck
 
