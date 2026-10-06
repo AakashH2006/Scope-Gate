@@ -41,23 +41,61 @@ LOCKED_DEMO_PAGES = [
 ]
 
 PAGE_CSS = """
-:root { color-scheme: light dark; }
-body { font: 15px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
-       margin: 0; background: Canvas; color: CanvasText; }
-.top { background: #22303f; color: #eef2f7; padding: 12px 20px; display: flex;
-       align-items: center; gap: 18px; }
-.top b { letter-spacing: -.01em; }
-.top a { color: #c9d6e4; text-decoration: none; font-size: 14px; }
-.top a:hover { color: #fff; text-decoration: underline; }
-main { max-width: 860px; margin: 0 auto; padding: 24px 18px 60px; }
-h1 { font-size: 21px; margin: 0 0 6px; }
-.sub { color: #70798a; margin: 0 0 22px; }
-table { width: 100%; border-collapse: collapse; font-size: 14px; }
-th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid #0001; }
-th { font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; color: #70798a; }
-.box { border: 1px solid #0002; border-radius: 8px; padding: 16px; margin: 18px 0; }
-.locked { color: #b3261e; }
-code { font-family: ui-monospace, Consolas, monospace; font-size: 13px; }
+:root {
+  --ink:#10151D; --soft:#5A6775; --dim:#8A95A3;
+  --line:#E3E8EF; --bg:#F6F8FB; --card:#FFFFFF;
+  --brand:#5B3DF5; --ok:#0F8A4D; --warn:#B8740A; --bad:#C2342B;
+}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--ink);
+  font:15px/1.55 'Inter', system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing:antialiased; }
+.top { background:#141B27; color:#E8ECF2; padding:0 28px; display:flex;
+  align-items:center; gap:4px; height:56px; }
+.top b { font-weight:650; font-size:15px; letter-spacing:-.01em; margin-right:20px;
+  display:flex; align-items:center; gap:9px; }
+.top b::before { content:""; width:9px; height:9px; border-radius:2px; background:var(--brand); }
+.top a { color:#9FACBD; text-decoration:none; font-size:14px; padding:7px 13px;
+  border-radius:7px; }
+.top a:hover { color:#fff; background:rgba(255,255,255,.07); }
+main { max-width:1000px; margin:0 auto; padding:30px 28px 70px; }
+.head { display:flex; align-items:flex-end; gap:16px; margin-bottom:24px; }
+h1 { font-size:25px; margin:0 0 4px; letter-spacing:-.02em; font-weight:650; }
+.sub { color:var(--soft); margin:0; font-size:14px; }
+.spacer { flex:1; }
+.stamp { font-size:12.5px; color:var(--dim); background:var(--card);
+  border:1px solid var(--line); border-radius:999px; padding:5px 13px; }
+.tiles { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:22px; }
+.tile { background:var(--card); border:1px solid var(--line); border-radius:11px; padding:16px 18px; }
+.tile .k { font-size:11.5px; text-transform:uppercase; letter-spacing:.07em;
+  color:var(--dim); font-weight:600; margin-bottom:7px; }
+.tile .v { font-size:28px; font-weight:650; letter-spacing:-.02em; line-height:1; }
+.tile .d { font-size:12.5px; color:var(--soft); margin-top:6px; }
+.box { background:var(--card); border:1px solid var(--line); border-radius:11px;
+  padding:18px 20px; margin:0 0 18px; }
+.box h2 { font-size:14px; margin:0 0 14px; font-weight:650; letter-spacing:-.01em; }
+table { width:100%; border-collapse:collapse; font-size:14px; }
+th,td { text-align:left; padding:9px 10px; border-bottom:1px solid var(--line); }
+th { font-size:11px; text-transform:uppercase; letter-spacing:.07em; color:var(--dim); font-weight:600; }
+tr:last-child td { border-bottom:0; }
+tbody tr:hover { background:#FAFBFD; }
+.pill { display:inline-block; padding:2px 9px; border-radius:999px; font-size:11.5px;
+  font-weight:600; border:1px solid currentColor; }
+.pill.ok { color:var(--ok); background:rgba(15,138,77,.08); }
+.pill.warn { color:var(--warn); background:rgba(184,116,10,.08); }
+.pill.bad { color:var(--bad); background:rgba(194,52,43,.08); }
+.bars { display:flex; align-items:flex-end; gap:7px; height:88px; margin:4px 0 10px; }
+.bars i { flex:1; background:linear-gradient(180deg,#7C63F7,#5B3DF5);
+  border-radius:4px 4px 0 0; display:block; }
+.axis { display:flex; gap:7px; font-size:11px; color:var(--dim); }
+.axis span { flex:1; text-align:center; }
+code { font-family:'JetBrains Mono', ui-monospace, Consolas, monospace; font-size:13px;
+  background:#F0F3F8; border:1px solid var(--line); border-radius:5px; padding:2px 7px; }
+.locked h1 { color:var(--bad); }
+input[type=text] { padding:9px 12px; border:1px solid var(--line); border-radius:8px;
+  font:inherit; background:var(--bg); }
+button { padding:9px 16px; border-radius:8px; border:0; background:var(--brand);
+  color:#fff; font:inherit; font-weight:600; cursor:pointer; }
 """
 
 
@@ -116,21 +154,56 @@ def create_app(self_url: str | None = None) -> FastAPI:
     @app.get("/dashboard/overview", response_class=HTMLResponse)
     async def overview() -> HTMLResponse:
         now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        bars = "".join(
+            f'<i style="height:{h}%"></i>'
+            for h in (52, 61, 48, 74, 69, 83, 58, 77, 91, 66, 72, 88)
+        )
+        axis = "".join(
+            f"<span>{m}</span>"
+            for m in ("Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+        )
         body = f"""
-        <h1>Overview</h1>
-        <p class="sub">Service health at {now}</p>
+        <div class="head">
+          <div><h1>Overview</h1><p class="sub">Platform health and this month's load</p></div>
+          <div class="spacer"></div>
+          <div class="stamp">{now}</div>
+        </div>
+        <div class="tiles">
+          <div class="tile"><div class="k">Uptime</div><div class="v">99.94%</div>
+            <div class="d">30-day rolling</div></div>
+          <div class="tile"><div class="k">Open incidents</div><div class="v">2</div>
+            <div class="d">1 degraded service</div></div>
+          <div class="tile"><div class="k">Requests</div><div class="v">4.1M</div>
+            <div class="d">+6.2% on last month</div></div>
+          <div class="tile"><div class="k">P95 latency</div><div class="v">182<span
+            style="font-size:15px;color:var(--soft)">ms</span></div>
+            <div class="d">within target</div></div>
+        </div>
         <div class="box">
+          <h2>Requests per month</h2>
+          <div class="bars">{bars}</div>
+          <div class="axis">{axis}</div>
+        </div>
+        <div class="box">
+          <h2>Service status</h2>
           <table>
-            <tr><th>Service</th><th>State</th><th>Last check</th></tr>
-            <tr><td>Billing API</td><td>healthy</td><td>2 min ago</td></tr>
-            <tr><td>Document store</td><td>healthy</td><td>1 min ago</td></tr>
-            <tr><td>Mail relay</td><td>degraded</td><td>4 min ago</td></tr>
-            <tr><td>Batch runner</td><td>healthy</td><td>just now</td></tr>
+            <tr><th>Service</th><th>State</th><th>Owner</th><th>Last check</th></tr>
+            <tr><td>Billing API</td><td><span class="pill ok">healthy</span></td>
+              <td>Payments</td><td>2 min ago</td></tr>
+            <tr><td>Document store</td><td><span class="pill ok">healthy</span></td>
+              <td>Platform</td><td>1 min ago</td></tr>
+            <tr><td>Mail relay</td><td><span class="pill warn">degraded</span></td>
+              <td>Platform</td><td>4 min ago</td></tr>
+            <tr><td>Batch runner</td><td><span class="pill ok">healthy</span></td>
+              <td>Data</td><td>just now</td></tr>
+            <tr><td>Search index</td><td><span class="pill ok">healthy</span></td>
+              <td>Data</td><td>3 min ago</td></tr>
           </table>
         </div>
         <div class="box">
-          <h2 style="font-size:15px;margin:0 0 8px">Live ticker</h2>
-          <p class="sub" style="margin:0 0 8px">
+          <h2>Live ticker</h2>
+          <p class="sub" style="margin:0 0 10px">
             A websocket, so the gateway can be seen cutting it when access ends.</p>
           <code id="tick">connecting&hellip;</code>
           <script>
@@ -166,7 +239,8 @@ def create_app(self_url: str | None = None) -> FastAPI:
     @app.get("/dashboard/reports", response_class=HTMLResponse)
     async def reports() -> HTMLResponse:
         rows = "".join(
-            f"<tr><td>{name}</td><td>{period}</td><td>{size}</td></tr>"
+            f"<tr><td><b>{name}</b></td><td>{period}</td><td>{size}</td>"
+            f"<td><span class='pill ok'>PDF</span></td></tr>"
             for name, period, size in [
                 ("Uptime summary", "September 2026", "412 KB"),
                 ("Incident review", "Q3 2026", "1.1 MB"),
@@ -175,10 +249,13 @@ def create_app(self_url: str | None = None) -> FastAPI:
             ]
         )
         body = f"""
-        <h1>Reports</h1>
-        <p class="sub">Generated nightly. Read-only for vendor accounts.</p>
-        <div class="box"><table>
-          <tr><th>Report</th><th>Period</th><th>Size</th></tr>{rows}
+        <div class="head">
+          <div><h1>Reports</h1><p class="sub">Generated nightly. Read-only for vendor accounts.</p></div>
+          <div class="spacer"></div>
+          <div class="stamp">4 available</div>
+        </div>
+        <div class="box"><h2>Published reports</h2><table>
+          <tr><th>Report</th><th>Period</th><th>Size</th><th>Format</th></tr>{rows}
         </table></div>
         <p class="sub">Need the raw numbers? That lives in
         <a href="{SELF_URL}/dashboard/finance">Finance</a>, which vendors cannot open.</p>
@@ -204,18 +281,22 @@ def create_app(self_url: str | None = None) -> FastAPI:
     @app.get("/dashboard/tickets", response_class=HTMLResponse)
     async def tickets() -> HTMLResponse:
         rows = "".join(
-            f"<tr><td><code>{ref}</code></td><td>{subject}</td><td>{state}</td></tr>"
-            for ref, subject, state in [
-                ("INC-4411", "Mail relay queue backing up", "open"),
-                ("INC-4408", "Nightly batch slower than usual", "investigating"),
-                ("REQ-2291", "Add read-only access for auditor", "done"),
-                ("INC-4399", "Certificate renewal warning", "closed"),
+            f"<tr><td><code>{ref}</code></td><td>{subject}</td>"
+            f"<td><span class='pill {cls}'>{state}</span></td></tr>"
+            for ref, subject, state, cls in [
+                ("INC-4411", "Mail relay queue backing up", "open", "bad"),
+                ("INC-4408", "Nightly batch slower than usual", "investigating", "warn"),
+                ("REQ-2291", "Add read-only access for auditor", "done", "ok"),
+                ("INC-4399", "Certificate renewal warning", "closed", "ok"),
             ]
         )
         body = f"""
-        <h1>Tickets</h1>
-        <p class="sub">Open and recent items.</p>
-        <div class="box"><table>
+        <div class="head">
+          <div><h1>Tickets</h1><p class="sub">Open and recent items.</p></div>
+          <div class="spacer"></div>
+          <div class="stamp">2 open</div>
+        </div>
+        <div class="box"><h2>Queue</h2><table>
           <tr><th>Ref</th><th>Subject</th><th>State</th></tr>{rows}
         </table></div>
         <div class="box">
@@ -241,8 +322,9 @@ def create_app(self_url: str | None = None) -> FastAPI:
     def _locked(title: str, path: str, blurb: str):
         async def view() -> HTMLResponse:
             body = f"""
-            <h1 class="locked">{title}</h1>
-            <p class="sub">{blurb}</p>
+            <div class="head locked">
+              <div><h1>{title}</h1><p class="sub">{blurb}</p></div>
+            </div>
             <div class="box">
               <p style="margin:0">If a vendor is reading this page, the gateway
               failed. It should never be forwarded.</p>

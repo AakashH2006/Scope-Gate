@@ -1,9 +1,9 @@
 <header class="bar">
-  <span class="brand">VendorGate</span>
+  <span class="brand"><span class="dot"></span>ScopeGate</span>
   <nav>
     <a href="/admin" class="{{ 'on' if page == 'dashboard' else '' }}">Grants</a>
     <a href="/admin/logs" class="{{ 'on' if page == 'logs' else '' }}">Logs</a>
-    <span class="mono" style="color:var(--ink-soft)">{{ admin_email }}</span>
+    <span class="who">{{ admin_email }}</span>
     <form method="post" action="/admin/logout" style="margin:0">
       <input type="hidden" name="csrf" value="{{ csrf_token }}">
       <button class="ghost" type="submit">Sign out</button>
