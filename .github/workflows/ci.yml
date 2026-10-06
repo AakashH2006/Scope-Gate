@@ -1,0 +1,97 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A new push to the same branch makes an in-flight run pointless.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Tests (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.13 is what this is developed on; 3.12 catches anything that has
+        # quietly started depending on a 3.13-only feature.
+        python-version: ["3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Lint
+        run: python -m pyflakes vendorgate mocksite tests scripts
+
+      - name: Unit and integration tests
+        # The integration tests bind loopback ports and run uvicorn in threads,
+        # because cutting a stream mid-flight cannot be observed at the ASGI
+        # layer. They need no outbound network.
+        run: python -m pytest -q
+
+      - name: Demo script, end to end
+        # Walks the ten-step demo from section 12 of README.md over real HTTP
+        # and fails the build if any of its 47 checks regress.
+        run: python scripts/demo_run.py
+
+      - name: Schema matches the models
+        # Catches a model edit that nobody wrote a migration for.
+        env:
+          DATABASE_URL: sqlite+aiosqlite:///./ci-check.db
+          SECRET_KEY: ci-only-key-not-used-for-anything-real-0123456789
+        run: |
+          python -m vendorgate.cli init-db
+          python -m alembic check
+
+  hygiene:
+    name: No secrets committed
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Nothing that must stay local is tracked
+        # The repository is public. .env holds SECRET_KEY and TOTP_ENC_KEY, the
+        # database holds the admin's password hash and encrypted TOTP secret,
+        # and outbox/ holds live link tokens and vendor passwords. A .gitignore
+        # mistake would publish any of them, so fail the build instead.
+        run: |
+          leaked=$(git ls-files | grep -E '^\.env$|\.db$|^outbox/|\.local\.txt$' || true)
+          if [ -n "$leaked" ]; then
+            echo "::error::These must never be committed:"
+            echo "$leaked"
+            exit 1
+          fi
+          echo "No secret files are tracked."
+
+      - name: .gitignore still covers them
+        run: |
+          missing=""
+          for pattern in '.env' '*.db' 'outbox/' '*.local.txt'; do
+            grep -qxF "$pattern" .gitignore || missing="$missing $pattern"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::.gitignore no longer lists:$missing"
+            exit 1
+          fi
+          echo ".gitignore covers every sensitive pattern."
