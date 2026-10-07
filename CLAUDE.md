@@ -20,10 +20,11 @@ Repo: https://github.com/AakashH2006/Scope-Gate (public)
 
 - Build-plan steps 1–9 and 11 done. **Step 10 (AWS deployment) has never been
   run** — everything in `deploy/` is reviewed-but-untested config.
-- CI runs lint, the 98 tests, the demo script and an `alembic check` on
+- CI runs lint, the 112 tests, the demo script and an `alembic check` on
   3.12 and 3.13, plus a job that fails if a secret file is ever tracked.
-- 98 tests pass (`python -m pytest`). `python scripts/demo_run.py` walks the
-  ten-step demo script over real HTTP: 47/47 checks.
+- 112 tests pass (`python -m pytest`). `python scripts/demo_run.py` walks the
+  ten-step demo script over real HTTP: 47/47 checks (the resend button is
+  covered by pytest, not by the demo script).
 - Local run: `python scripts/run_local.py` → gateway on :8000, mock site on
   :9000. Admin credentials are in `admin-credentials.local.txt` (gitignored).
 - Database is a local SQLite file `scopegate.db` (gitignored). Holds one admin.
@@ -43,6 +44,13 @@ Repo: https://github.com/AakashH2006/Scope-Gate (public)
 - **Grants are immutable.** An admin cannot add pages or extend time on a live
   grant; more of either means a new grant. Widening was considered and rejected
   as added risk.
+- **Resend reissues, it does not repeat.** Only hashes of the link and password
+  are stored, so the Resend button on a `pending` grant mints a new pair and
+  kills the old one. Pages, duration, link deadline and the failed-attempt
+  count are all untouched, so it widens nothing — that is why it is allowed
+  alongside immutability. It needs the master password, like creating a grant.
+  Storing the plaintext invite so it could be re-sent verbatim was rejected:
+  it would put a live vendor password at rest.
 - **`BLOCKED_LINKS=remove`** — links to pages outside the grant are stripped
   from proxied HTML so a vendor cannot even read what else exists. Defence in
   depth; the path allowlist is still the control.
@@ -59,10 +67,11 @@ Repo: https://github.com/AakashH2006/Scope-Gate (public)
    EC2 blocks outbound port 25, so use 587; SES starts in sandbox and silently
    delivers only to **verified** addresses; Gmail needs an app password (not
    the account password) and rewrites `From` to match `SMTP_USER`.
-2. **Mail has no retries.** One attempt, then an `email_failed` audit row, and
-   the vendor silently never gets their link. Roughly 40 lines plus tests.
-   Worth doing *before* deploying — it is the gap most likely to embarrass a
-   live demo. A resend button on the dashboard would pair with it.
+2. **Mail has no automatic retry.** One attempt, then an `email_failed` audit
+   row. The **manual** half is done: the dashboard flags failures and a
+   `pending` grant has a Resend button. What is still missing is something that
+   retries on its own, so a failure nobody looks at is still a vendor who never
+   gets their link. Roughly 40 lines plus tests.
 3. **Single process.** Admin sessions, the login rate limiter and the expiry
    job are all in memory, so a second uvicorn worker breaks all three. Fine for
    a demo; the first thing to fix if anyone asks about load.
@@ -71,7 +80,7 @@ Repo: https://github.com/AakashH2006/Scope-Gate (public)
 
 ## Open questions, not yet decided
 
-- Do the mail retries before the AWS deployment, or deploy first?
+- Do the automatic mail retries before the AWS deployment, or deploy first?
 
 ## The deck
 

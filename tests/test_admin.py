@@ -1,7 +1,40 @@
 """Admin authentication, grant creation and the log views (sections 6.4, 8, 10)."""
 from __future__ import annotations
 
+import asyncio
+from datetime import timedelta
+
+from sqlalchemy import select
+
+from scopegate.db import session_scope
+from scopegate.models import Event, Grant
 from tests.conftest import ADMIN_PASSWORD, ALLOWED_PAGES, AdminCreds
+
+
+async def _grant(public_id: str) -> Grant:
+    async with session_scope() as db:
+        return (
+            await db.execute(select(Grant).where(Grant.public_id == public_id))
+        ).scalar_one()
+
+
+async def _close_link_window(public_id: str) -> None:
+    """Push a grant's link deadline into the past without waiting for it."""
+    async with session_scope() as db:
+        grant = (
+            await db.execute(select(Grant).where(Grant.public_id == public_id))
+        ).scalar_one()
+        grant.link_expires_at = grant.link_expires_at - timedelta(hours=4)
+
+
+async def _event_types(public_id: str) -> list[str]:
+    async with session_scope() as db:
+        rows = (
+            await db.execute(
+                select(Event).where(Event.grant_public_id == public_id).order_by(Event.id)
+            )
+        ).scalars().all()
+        return [e.type for e in rows]
 
 
 def test_admin_pages_require_a_session(client):
@@ -254,6 +287,243 @@ def test_revoke_needs_csrf_and_an_existing_grant(client, admin, issue_grant):
         follow_redirects=False,
     )
     assert "already revoked" in admin.flash["error"]
+
+
+# --------------------------------------------------------------------------- #
+# resending an invite.  The link and the password are stored only as hashes, so
+# a resend replaces them rather than repeating them.
+# --------------------------------------------------------------------------- #
+
+def _resend(client, admin, public_id, *, password=ADMIN_PASSWORD, csrf=None):
+    return client.post(
+        f"/admin/grants/{public_id}/resend",
+        data={
+            "csrf": admin.csrf_token if csrf is None else csrf,
+            "master_password": password,
+        },
+        follow_redirects=False,
+    )
+
+
+def test_resend_button_appears_only_while_the_link_is_unused(client, admin, issue_grant):
+    grant = issue_grant()
+    link = f"/admin/grants/{grant.public_id}/resend"
+    assert link in client.get("/admin").text
+
+    client.post(
+        f"/admin/grants/{grant.public_id}/revoke",
+        data={"csrf": admin.csrf_token},
+        follow_redirects=False,
+    )
+    assert link not in client.get("/admin").text
+
+
+def test_resend_confirm_page_states_what_it_costs(client, admin, issue_grant):
+    grant = issue_grant()
+    page = client.get(f"/admin/grants/{grant.public_id}/resend")
+    assert page.status_code == 200
+    assert grant.vendor_email in page.text
+    assert "stops working immediately" in page.text
+    assert "not extended" in page.text
+    for path in ALLOWED_PAGES[:2]:
+        assert path in page.text
+    # Confirming is not a second chance to read the secret that was sent.
+    assert grant.token not in page.text
+    assert grant.password not in page.text
+
+
+def test_resend_replaces_the_link_and_the_password(client, admin, issue_grant):
+    grant = issue_grant()
+
+    assert _resend(client, admin, grant.public_id).status_code == 303
+    issued = admin.flash["issued"]
+    assert issued["resent"] is True
+    assert issued["public_id"] == grant.public_id
+    assert issued["vendor_email"] == grant.vendor_email
+    assert issued["link"] != grant.link
+    assert issued["password"] != grant.password
+
+    new_token = issued["link"].rsplit("/", 1)[-1]
+
+    # The link already sent is now indistinguishable from an unknown one.
+    assert client.get(f"/{grant.token}").status_code == 404
+    old = client.post(
+        f"/{grant.token}/login",
+        data={"email": grant.vendor_email, "password": grant.password},
+        follow_redirects=False,
+    )
+    assert old.status_code == 404
+
+    # Nor does the old password work on the new link.
+    stale = client.post(
+        f"/{new_token}/login",
+        data={"email": grant.vendor_email, "password": grant.password},
+        follow_redirects=False,
+    )
+    assert stale.status_code == 401
+
+    fresh = client.post(
+        f"/{new_token}/login",
+        data={"email": grant.vendor_email, "password": issued["password"]},
+        follow_redirects=False,
+    )
+    assert fresh.status_code == 303
+
+
+def test_resend_changes_nothing_else_about_the_grant(client, admin, issue_grant):
+    grant = issue_grant(duration_minutes=45, pages=ALLOWED_PAGES[:1])
+    before = asyncio.run(_grant(grant.public_id))
+
+    assert _resend(client, admin, grant.public_id).status_code == 303
+    after = asyncio.run(_grant(grant.public_id))
+
+    assert after.allowed_paths == before.allowed_paths
+    assert after.duration_minutes == before.duration_minutes
+    assert after.link_expires_at == before.link_expires_at
+    assert after.vendor_email == before.vendor_email
+    assert after.status == before.status
+    assert after.token_hash != before.token_hash
+    assert after.password_hash != before.password_hash
+
+
+def test_resend_requires_the_master_password(client, admin, issue_grant):
+    grant = issue_grant()
+
+    response = _resend(client, admin, grant.public_id, password="the-wrong-password")
+    assert response.status_code == 303
+    assert admin.flash == {
+        "error": "Your password was not correct. The link was not changed."
+    }
+
+    # The link the vendor already has still works, so nothing was rotated.
+    assert client.get(f"/{grant.token}").status_code == 200
+    assert "invite_resent" not in asyncio.run(_event_types(grant.public_id))
+
+
+def test_resend_requires_a_csrf_token(client, admin, issue_grant):
+    grant = issue_grant()
+    assert _resend(client, admin, grant.public_id, csrf="forged").status_code == 303
+    assert "could not be verified" in admin.flash["error"]
+    assert client.get(f"/{grant.token}").status_code == 200
+    assert "invite_resent" not in asyncio.run(_event_types(grant.public_id))
+
+
+def test_resend_is_refused_once_the_vendor_has_signed_in(client, admin, vendor_in):
+    grant = vendor_in()
+
+    form = client.get(f"/admin/grants/{grant.public_id}/resend", follow_redirects=False)
+    assert form.status_code == 303
+    assert "is active" in admin.flash["error"]
+
+    assert _resend(client, admin, grant.public_id).status_code == 303
+    assert "This grant is active" in admin.flash["error"]
+    assert "invite_resent" not in asyncio.run(_event_types(grant.public_id))
+
+
+def test_resend_is_refused_once_the_link_window_has_closed(client, admin, issue_grant):
+    """The window the admin chose is not reopened -- that would be extending time."""
+    grant = issue_grant()
+    asyncio.run(_close_link_window(grant.public_id))
+
+    form = client.get(f"/admin/grants/{grant.public_id}/resend", follow_redirects=False)
+    assert form.status_code == 303
+    assert admin.flash["error"] == (
+        "The link window for this grant has closed. Issue a new grant."
+    )
+
+    assert _resend(client, admin, grant.public_id).status_code == 303
+    assert "link window for this grant has closed" in admin.flash["error"]
+    assert "invite_resent" not in asyncio.run(_event_types(grant.public_id))
+    # Refusing it also settles the grant, so the dashboard stops saying pending.
+    assert asyncio.run(_grant(grant.public_id)).status == "expired_unused"
+
+
+def test_resend_is_refused_for_a_revoked_grant(client, admin, issue_grant):
+    grant = issue_grant()
+    client.post(
+        f"/admin/grants/{grant.public_id}/revoke",
+        data={"csrf": admin.csrf_token},
+        follow_redirects=False,
+    )
+    assert _resend(client, admin, grant.public_id).status_code == 303
+    assert "This grant is revoked" in admin.flash["error"]
+
+
+def test_resend_does_not_hand_back_lock_out_budget(client, admin, issue_grant):
+    """New credentials, same failed-attempt count: a resend buys no extra tries."""
+    grant = issue_grant()
+    client.post(
+        f"/{grant.token}/login",
+        data={"email": grant.vendor_email, "password": "wrong"},
+        follow_redirects=False,
+    )
+    assert asyncio.run(_grant(grant.public_id)).failed_attempts == 1
+
+    assert _resend(client, admin, grant.public_id).status_code == 303
+    assert asyncio.run(_grant(grant.public_id)).failed_attempts == 1
+
+
+def test_resend_shows_the_new_secret_once_on_the_dashboard(client, admin, issue_grant):
+    import html
+
+    grant = issue_grant()
+    client.get("/admin")  # clear the creation flash
+    assert _resend(client, admin, grant.public_id).status_code == 303
+    password = admin.flash["issued"]["password"]
+
+    first = client.get("/admin")
+    assert "new link sent" in first.text
+    assert "previous ones stopped working" in first.text
+    assert html.escape(password) in first.text
+    assert html.escape(grant.password) not in first.text
+
+    assert html.escape(password) not in client.get("/admin").text
+
+
+def test_resend_mails_a_second_invite_and_logs_it(client, admin, issue_grant, settings):
+    import email
+    import pathlib
+
+    grant = issue_grant()
+    assert _resend(client, admin, grant.public_id).status_code == 303
+    new_password = admin.flash["issued"]["password"]
+    new_link = admin.flash["issued"]["link"]
+
+    outbox = sorted(pathlib.Path(settings.mail_outbox_dir).glob("*.eml"))
+    assert len(outbox) == 2
+    message = email.message_from_string(outbox[-1].read_text(encoding="utf-8"))
+    assert message["To"] == grant.vendor_email
+    body = message.get_payload(decode=True).decode("utf-8")
+    assert new_link in body
+    assert new_password in body
+    assert grant.password not in body
+
+    types = asyncio.run(_event_types(grant.public_id))
+    assert types.count("invite_resent") == 1
+    assert types.count("email_sent") == 2
+
+    logs = client.get("/admin/logs").text
+    assert ">invite_resent</td>" in logs
+    assert new_password not in logs
+    assert new_link.rsplit("/", 1)[-1] not in logs
+
+
+def test_resend_needs_an_admin_session(client):
+    for method in ("get", "post"):
+        response = getattr(client, method)(
+            "/admin/grants/g-NOPE00/resend", follow_redirects=False
+        )
+        assert response.status_code == 303
+        assert response.headers["location"] == "/admin/login"
+
+
+def test_resend_of_an_unknown_grant_says_so(client, admin):
+    form = client.get("/admin/grants/g-NOPE00/resend", follow_redirects=False)
+    assert form.status_code == 303
+    assert admin.flash["error"] == "No such grant."
+
+    assert _resend(client, admin, "g-NOPE00").status_code == 303
+    assert admin.flash["error"] == "No such grant."
 
 
 def test_no_openapi_or_docs_are_exposed(client):

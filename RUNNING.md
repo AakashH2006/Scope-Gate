@@ -6,7 +6,7 @@ The plan is in [README.md](README.md). This is how to run what has been built.
 scopegate/           the gateway: auth, grants, proxy, expiry, audit log
 mocksite/            the mock internal dashboard (the demo target)
 migrations/          Alembic revisions
-tests/               88 tests, including the checklist in section 14
+tests/               112 tests, including the checklist in section 14
 scripts/run_local.py start both servers for a local demo
 scripts/demo_run.py  drive the whole demo script headlessly, with pass/fail
 deploy/              Caddyfile, systemd units, deployment notes
@@ -42,7 +42,7 @@ the grant is created.
 ## Does it work?
 
 ```bash
-python -m pytest                 # 88 tests, ~50s
+python -m pytest                 # 112 tests, ~45s
 python -m pytest -m "not integration"   # skip the ones that need real sockets
 python scripts/demo_run.py       # the 10-step demo script, 47 checks
 ```

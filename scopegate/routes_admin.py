@@ -30,6 +30,7 @@ from .grants import (
     create_grant,
     grant_by_public_id,
     list_grants,
+    reissue_credentials,
     revoke,
 )
 from .mailer import VendorInvite
@@ -400,6 +401,146 @@ async def _send_invite(
         # A slow mail server must not hold up the response; the audit row still
         # lands when the thread finishes.
         return "still sending"
+
+
+# --------------------------------------------------------------------------- #
+# resend the invite
+# --------------------------------------------------------------------------- #
+
+@router.get("/grants/{public_id}/resend")
+async def resend_form(request: Request, public_id: str) -> Response:
+    """Confirm page.  A resend replaces the vendor's credentials, so the admin
+    is told what it costs before they do it, not after."""
+    session = _current_session(request)
+    if session is None:
+        return _login_redirect()
+
+    async with request.app.state.sessionmaker() as db:
+        grant = await grant_by_public_id(db, public_id)
+        if grant is None or grant.status != GrantStatus.pending.value:
+            await db.commit()
+            session.flash = {
+                "error": (
+                    "No such grant."
+                    if grant is None
+                    else f"Grant {public_id} is {grant.status}; only a link that has "
+                    "not been used yet can be sent again."
+                )
+            }
+            return RedirectResponse("/admin", status_code=303)
+        # Still pending only because the sweep has not caught up.  Say so rather
+        # than offering a form the POST would refuse; the sweep does the status
+        # change, so this stays a read-only GET.
+        link_expires = as_utc(grant.link_expires_at)
+        if link_expires is not None and utcnow() >= link_expires:
+            await db.commit()
+            session.flash = {
+                "error": "The link window for this grant has closed. Issue a new grant."
+            }
+            return RedirectResponse("/admin", status_code=303)
+        context = {
+            "page": "dashboard",
+            "admin_email": session.admin_email,
+            "csrf_token": session.csrf_token,
+            "public_id": grant.public_id,
+            "vendor_email": grant.vendor_email,
+            "allowed_paths": list(grant.allowed_paths or []),
+            "duration_minutes": grant.duration_minutes,
+            "link_expires": _fmt(grant.link_expires_at),
+            "link_left": _fmt_left(grant.link_seconds_left()),
+            "failed_attempts": grant.failed_attempts or 0,
+        }
+        await db.commit()
+
+    return _templates(request).TemplateResponse(request, "admin/resend.html", context)
+
+
+@router.post("/grants/{public_id}/resend")
+async def resend_route(
+    request: Request,
+    public_id: str,
+    csrf: str = Form(default=""),
+    master_password: str = Form(default=""),
+) -> Response:
+    session = _current_session(request)
+    if session is None:
+        return _login_redirect()
+    settings = _settings(request)
+
+    if not admin_csrf_ok(session, csrf):
+        session.flash = {"error": "That request could not be verified. Try again."}
+        return RedirectResponse("/admin", status_code=303)
+
+    ip = client_ip(request, settings)
+    ua = user_agent(request)
+
+    async with request.app.state.sessionmaker() as db:
+        admin = (
+            await db.execute(select(Admin).where(Admin.id == session.admin_id))
+        ).scalar_one_or_none()
+        if admin is None:
+            request.app.state.admin_sessions.drop(session.sid)
+            await db.commit()
+            return _login_redirect()
+
+        # Same step-up as creating a grant: this mints a working password and
+        # mails it, so an open session on its own must not be enough.
+        if not verify_password(admin.password_hash, master_password):
+            await log_event(
+                db,
+                type=EventType.admin_login_failed,
+                actor="admin",
+                ip=ip,
+                user_agent=ua,
+                detail=f"master password re-entry failed while resending grant {public_id}",
+            )
+            await db.commit()
+            session.flash = {
+                "error": "Your password was not correct. The link was not changed."
+            }
+            return RedirectResponse("/admin", status_code=303)
+        session.last_stepup = time.time()
+
+        grant = await grant_by_public_id(db, public_id)
+        if grant is None:
+            await db.commit()
+            session.flash = {"error": "No such grant."}
+            return RedirectResponse("/admin", status_code=303)
+        try:
+            reissued = await reissue_credentials(
+                db, settings, grant=grant, ip=ip, user_agent=ua
+            )
+        except GrantError as exc:
+            await db.commit()
+            session.flash = {"error": str(exc)}
+            return RedirectResponse("/admin", status_code=303)
+
+        link = build_link(settings, reissued.token)
+        invite = VendorInvite(
+            vendor_email=grant.vendor_email,
+            link=link,
+            password=reissued.password,
+            link_expires_at=as_utc(grant.link_expires_at) or utcnow(),
+            duration_minutes=grant.duration_minutes,
+            allowed_paths=list(grant.allowed_paths or []),
+            public_url=settings.public_url,
+        )
+        grant_id, vendor = grant.id, grant.vendor_email
+        await db.commit()
+
+    mail_detail = await _send_invite(request, invite, grant_id=grant_id, public_id=public_id)
+
+    session.flash = {
+        "issued": {
+            "public_id": public_id,
+            "vendor_email": vendor,
+            "link": link,
+            "password": reissued.password,
+            "mail_detail": mail_detail,
+            "resent": True,
+        }
+    }
+    return RedirectResponse("/admin", status_code=303)
 
 
 # --------------------------------------------------------------------------- #

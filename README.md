@@ -109,6 +109,7 @@ Rules:
 - A grant never moves backwards.
 - `revoked`, `expired`, `expired_unused` and `locked` are final. Giving the vendor more time means creating a new grant.
 - Revoking a `pending` grant is allowed and kills the link.
+- A `pending` grant's **credentials** may be reissued (section 9, "resend"): a new link and password replace the old ones, which stop working at once. The pages, the access duration and the link deadline are untouched, so a resend widens nothing and is not a way to extend a grant.
 
 ## 5. Architecture
 
@@ -243,6 +244,8 @@ Event types: `grant_created`, `email_sent`, `email_failed`, `link_viewed`, `logi
 | GET | `/admin` | Dashboard: grants, status, time left, last week of logs |
 | POST | `/admin/grants` | Create grant (needs master password re-entry) |
 | POST | `/admin/grants/{id}/revoke` | Revoke now |
+| GET | `/admin/grants/{id}/resend` | Confirm page for a resend (`pending` grants only) |
+| POST | `/admin/grants/{id}/resend` | Reissue the link and password and email them again (needs master password re-entry) |
 | GET | `/admin/logs` | Log view (last 7 days) with filters |
 | POST | `/admin/logout` | End admin session |
 
@@ -265,6 +268,7 @@ Unknown, expired or revoked tokens all return the same neutral "link not valid" 
 - Settings are loaded from environment variables or a `mail.env` file readable only by its owner (same approach as the existing `access/mail.py` in the dvr-forensics-toolkit repo, which can be adapted).
 - The vendor email contains: the link, the password, the link-expiry time, the access duration, and a short plain-language note. No tracking pixels, no external images.
 - The admin is told on the dashboard if sending fails (`email_failed`).
+- **Resend.** Only the hashes of the link and password are kept, so a failed send cannot be repeated - it can only be replaced. A `pending` grant has a **Resend** button that mints a new link and password, invalidates the old ones and emails the vendor again, logging `invite_resent`. It needs the master password, because it issues a working credential. There is no automatic retry: one send is attempted, and a failure is the admin's to notice and resend.
 - **Open item:** the link and password travel in the same email. This is accepted for the demo and flagged for later (see section 16).
 
 ## 10. Logging and retention
@@ -359,6 +363,11 @@ It exists to show the gateway letting some pages through and refusing others.
 - [ ] Expiry closes open websocket / streaming connections
 - [ ] Expired and revoked links show the same neutral page
 - [ ] Admin cannot create a grant without re-entering the master password
+- [ ] Resending an invite replaces the link and password; the old pair stops working
+- [ ] Resending changes no pages, no duration and no deadline, and resets no failed-attempt count
+- [ ] Resending is refused once the vendor has signed in, once the link window has
+  closed, and for a final grant
+- [ ] Resending needs the master password and a CSRF token
 - [ ] Admin login without TOTP fails
 - [ ] Logs show 7 days on the dashboard and 1 year is kept in the database
 - [ ] No tokens, passwords or session ids appear in any log
@@ -393,3 +402,4 @@ Not part of the demo; to be designed once a client is signed.
 - The gateway is a high-value target (it is internet-facing and bridges to the internal site). It needs regular patching, rate limiting, and monitoring.
 - If the admin account is compromised, grants can be issued. TOTP and the master-password step-up reduce, but do not remove, this risk.
 - Single admin means no separation of duties and a single point of failure for revoking access.
+- Mail is one attempt with no automatic retry. A failure is visible on the dashboard and in the log, and the admin resends; nothing chases it on its own.

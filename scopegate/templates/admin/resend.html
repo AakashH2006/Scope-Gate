@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Resend {{ public_id }} &middot; ScopeGate{% endblock %}
+{% block chrome %}{% include "admin/_chrome.html" %}{% endblock %}
+{% block wrapclass %}narrow{% endblock %}
+{% block content %}
+
+<h1>Resend grant {{ public_id }}</h1>
+<p class="lede">The vendor has not signed in yet, so the link can be sent again.</p>
+
+<div class="card">
+  <table>
+    <tr><th>Vendor</th><td>{{ vendor_email }}</td></tr>
+    <tr><th>Pages</th>
+        <td class="mono">{% for p in allowed_paths %}{{ p }}<br>{% endfor %}</td></tr>
+    <tr><th>Access once signed in</th><td>{{ duration_minutes }} min</td></tr>
+    <tr><th>Link window ends</th>
+        <td class="mono">{{ link_expires }} UTC ({{ link_left }} left)</td></tr>
+    {% if failed_attempts %}
+    <tr><th>Failed sign-ins</th><td>{{ failed_attempts }}</td></tr>
+    {% endif %}
+  </table>
+
+  <p class="hint">
+    A fresh link and password are generated and emailed to the same address.
+    <strong>The link already sent stops working immediately.</strong> Nothing else
+    changes: the same pages, the same {{ duration_minutes }} minutes of access, and
+    the same link window &mdash; it is not extended, so the new link must still be
+    used before {{ link_expires }} UTC.
+    {% if failed_attempts %}
+    The {{ failed_attempts }} failed sign-in(s) stay on the count; a resend does not
+    give the vendor more attempts.
+    {% endif %}
+  </p>
+
+  <form method="post" action="/admin/grants/{{ public_id }}/resend" autocomplete="off">
+    <input type="hidden" name="csrf" value="{{ csrf_token }}">
+
+    <label for="master_password">Confirm your password</label>
+    <input id="master_password" name="master_password" type="password" required autofocus
+           autocomplete="current-password">
+    <div class="hint">Required because this issues a new working password.</div>
+
+    <div class="actions">
+      <button type="submit">Send a new link</button>
+      <a class="btn ghost" href="/admin">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -110,6 +110,9 @@ button.danger { background: transparent; color: var(--bad); border-color: rgba(2
 button.danger:hover { background: rgba(248, 81, 73, .12); }
 button:disabled { opacity: .45; cursor: not-allowed; }
 .actions { display: flex; gap: 10px; align-items: center; margin-top: 20px; }
+/* Per-row buttons in the grants table; the buttons are narrower than .actions. */
+.rowacts { display: flex; gap: 8px; align-items: center; }
+.rowacts .btn, .rowacts button { padding: 7px 12px; font-size: 13px; }
 
 .hint { font-size: 12.5px; color: var(--ink-dim); margin-top: 6px; line-height: 1.5; }
 

@@ -15,11 +15,18 @@
 
 {% if issued %}
 <div class="card">
-  <h2>Grant {{ issued.public_id }} created</h2>
+  <h2>Grant {{ issued.public_id }}
+    {%- if issued.resent %} &mdash; new link sent{% else %} created{% endif %}</h2>
   <p class="hint">
-    The link and password were emailed to <strong>{{ issued.vendor_email }}</strong>
-    ({{ issued.mail_detail }}). They are shown once here so you can read them out if
-    the mail is slow &mdash; they are not stored and will not appear again.
+    {% if issued.resent %}
+      A new link and password were emailed to <strong>{{ issued.vendor_email }}</strong>
+      ({{ issued.mail_detail }}) and the previous ones stopped working.
+    {% else %}
+      The link and password were emailed to <strong>{{ issued.vendor_email }}</strong>
+      ({{ issued.mail_detail }}).
+    {% endif %}
+    They are shown once here so you can read them out if the mail is slow &mdash;
+    they are not stored and will not appear again.
   </p>
   <label>Link</label>
   <div class="secretbox">{{ issued.link }}</div>
@@ -81,7 +88,8 @@
     {% if mail_failures %}
       <p class="hint" style="color:var(--bad)">
         {{ mail_failures }} email(s) failed to send in the last
-        {{ log_dashboard_days }} days &mdash; see the logs.
+        {{ log_dashboard_days }} days &mdash; see the logs. Resend any grant still
+        waiting for its first sign-in from the table below.
       </p>
     {% endif %}
   </div>
@@ -112,12 +120,17 @@
       <td class="mono">{% for p in row.grant.allowed_paths %}{{ p }}<br>{% endfor %}</td>
       <td class="mono">{{ row.created }}</td>
       <td>
-        {% if not row.grant.is_final %}
-        <form method="post" action="/admin/grants/{{ row.grant.public_id }}/revoke" style="margin:0">
-          <input type="hidden" name="csrf" value="{{ csrf_token }}">
-          <button class="danger" type="submit">Revoke</button>
-        </form>
-        {% endif %}
+        <div class="rowacts">
+          {% if row.grant.status == 'pending' %}
+          <a class="btn ghost" href="/admin/grants/{{ row.grant.public_id }}/resend">Resend</a>
+          {% endif %}
+          {% if not row.grant.is_final %}
+          <form method="post" action="/admin/grants/{{ row.grant.public_id }}/revoke" style="margin:0">
+            <input type="hidden" name="csrf" value="{{ csrf_token }}">
+            <button class="danger" type="submit">Revoke</button>
+          </form>
+          {% endif %}
+        </div>
       </td>
     </tr>
   {% endfor %}

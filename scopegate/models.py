@@ -63,6 +63,7 @@ class EventType(str, enum.Enum):
     grant_created = "grant_created"
     email_sent = "email_sent"
     email_failed = "email_failed"
+    invite_resent = "invite_resent"
     link_viewed = "link_viewed"
     login_ok = "login_ok"
     login_failed = "login_failed"

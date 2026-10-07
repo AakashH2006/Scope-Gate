@@ -46,8 +46,9 @@ class GrantError(Exception):
 
 @dataclass(frozen=True)
 class NewGrant:
-    """Result of creating a grant.  ``token`` and ``password`` exist only here
-    and in the email -- the database holds hashes."""
+    """Result of creating a grant, or of reissuing its credentials.  ``token``
+    and ``password`` exist only here and in the email -- the database holds
+    hashes."""
 
     grant: Grant
     token: str
@@ -141,6 +142,60 @@ async def create_grant(
 
 def build_link(settings: Settings, token: str) -> str:
     return f"{settings.public_url}/{token}"
+
+
+async def reissue_credentials(
+    db: AsyncSession,
+    settings: Settings,
+    *,
+    grant: Grant,
+    ip: str | None = None,
+    user_agent: str | None = None,
+) -> NewGrant:
+    """Mint a fresh link and password for a grant whose invite never arrived.
+
+    The stored hashes are the only copy of the originals, so a failed send
+    cannot be repeated -- it can only be replaced.  Nothing about the grant
+    widens: the pages, the access duration and the link deadline are untouched,
+    so this is not a way around "a grant is immutable" (section 4).  The old
+    token and password stop working the moment the hashes are overwritten, so a
+    grant never has two live credential pairs.
+    """
+    if grant.status != GrantStatus.pending.value:
+        raise GrantError(
+            f"This grant is {grant.status}. Only a link that has not been used "
+            "yet can be sent again."
+        )
+    now = utcnow()
+    link_expires = as_utc(grant.link_expires_at)
+    if link_expires is not None and now >= link_expires:
+        # The window the admin chose has closed; reopening it would be extending
+        # time, which is exactly what a new grant is for.
+        await expire_unused(db, grant)
+        raise GrantError("The link window for this grant has closed. Issue a new grant.")
+
+    token = generate_link_token()
+    password = generate_password(settings.vendor_password_length)
+    grant.token_hash = hash_token(settings.secret_key, token)
+    grant.password_hash = hash_password(password)
+    # failed_attempts deliberately survives: a resend replaces the credentials,
+    # it does not hand back lock-out budget.
+
+    await log_event(
+        db,
+        type=EventType.invite_resent,
+        actor="admin",
+        grant=grant,
+        ip=ip,
+        user_agent=user_agent,
+        detail=(
+            f"link and password reissued for {grant.vendor_email}; "
+            f"the previous link stopped working. "
+            f"attempts so far {grant.failed_attempts or 0}/{settings.max_login_attempts}"
+        ),
+    )
+    await db.flush()
+    return NewGrant(grant=grant, token=token, password=password)
 
 
 # --------------------------------------------------------------------------- #
