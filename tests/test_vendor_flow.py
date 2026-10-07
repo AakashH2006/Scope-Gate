@@ -7,9 +7,9 @@ from datetime import timedelta
 from sqlalchemy import select
 
 from tests.conftest import ALLOWED_PAGES
-from vendorgate.db import session_scope
-from vendorgate.grants import sweep_expired
-from vendorgate.models import Event, Grant, GrantStatus, Session, utcnow
+from scopegate.db import session_scope
+from scopegate.grants import sweep_expired
+from scopegate.models import Event, Grant, GrantStatus, Session, utcnow
 
 
 # --------------------------------------------------------------------------- #
@@ -223,10 +223,10 @@ def test_clearing_cookies_ends_access(client, vendor_in):
 
 def test_a_stolen_cookie_on_another_device_is_refused(client, vendor_in, other_device):
     grant = vendor_in()
-    stolen = client.cookies.get("vg_session")
+    stolen = client.cookies.get("sg_session")
 
     thief = other_device("A Completely Different Browser")
-    thief.cookies.set("vg_session", stolen)
+    thief.cookies.set("sg_session", stolen)
     response = thief.get(f"/s{ALLOWED_PAGES[0]}")
     assert response.status_code == 403
     assert "tied to the device" in response.text
@@ -351,7 +351,7 @@ def test_a_redirect_inside_the_grant_is_rewritten(app, settings, vendor_in, clie
 def test_the_countdown_banner_is_injected_with_a_working_status_endpoint(client, vendor_in):
     vendor_in(duration_minutes=30, pages=[ALLOWED_PAGES[0]])
     page = client.get(f"/s{ALLOWED_PAGES[0]}")
-    assert 'id="vg-bar"' in page.text
+    assert 'id="sg-bar"' in page.text
     assert "/s/_status" in page.text
 
     status = client.get("/s/_status")
@@ -505,7 +505,7 @@ def test_no_secret_ever_reaches_the_audit_log(client, vendor_in):
     grant = vendor_in(pages=ALLOWED_PAGES)
     client.get(f"/s{ALLOWED_PAGES[0]}")
     client.get("/s/dashboard/finance")
-    cookie = client.cookies.get("vg_session")
+    cookie = client.cookies.get("sg_session")
 
     rows = asyncio.run(_events())
     blob = " | ".join(
@@ -530,7 +530,7 @@ def test_retention_prunes_old_events_only(client, issue_grant, settings):
     issue_grant()
 
     async def age_and_prune():
-        from vendorgate.events import prune_events
+        from scopegate.events import prune_events
 
         async with session_scope() as db:
             rows = (await db.execute(select(Event))).scalars().all()

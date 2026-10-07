@@ -264,6 +264,6 @@ def test_no_openapi_or_docs_are_exposed(client):
 def test_root_and_robots_reveal_nothing(client):
     root = client.get("/")
     assert root.status_code == 404
-    assert "VendorGate" not in root.text
+    assert "ScopeGate" not in root.text
     robots = client.get("/robots.txt")
     assert "Disallow: /" in robots.text

@@ -30,12 +30,12 @@ import uvicorn  # noqa: E402
 from sqlalchemy import select  # noqa: E402
 
 from mocksite.app import create_app as create_mocksite  # noqa: E402
-from vendorgate.app import create_app  # noqa: E402
-from vendorgate.config import Settings  # noqa: E402
-from vendorgate.db import create_all, dispose_engine, init_engine, session_scope  # noqa: E402
-from vendorgate.grants import sweep_expired  # noqa: E402
-from vendorgate.models import Admin, Event, Grant, utcnow  # noqa: E402
-from vendorgate.security import (  # noqa: E402
+from scopegate.app import create_app  # noqa: E402
+from scopegate.config import Settings  # noqa: E402
+from scopegate.db import create_all, dispose_engine, init_engine, session_scope  # noqa: E402
+from scopegate.grants import sweep_expired  # noqa: E402
+from scopegate.models import Admin, Event, Grant, utcnow  # noqa: E402
+from scopegate.security import (  # noqa: E402
     encrypt_totp_secret,
     generate_totp_enc_key,
     generate_totp_secret,
@@ -195,14 +195,14 @@ def issue(admin_client: httpx.Client, app, csrf: str, **form) -> dict:
 
 
 def run() -> int:
-    tmp = Path(tempfile.mkdtemp(prefix="vendorgate-demo-"))
+    tmp = Path(tempfile.mkdtemp(prefix="scopegate-demo-"))
     mock_port, gateway_port = free_port(), free_port()
     settings, totp_secret = build_settings(
         tmp, upstream=f"http://127.0.0.1:{mock_port}", gateway_port=gateway_port
     )
     app = create_app(settings, start_worker=False)
 
-    print("VendorGate demo run")
+    print("ScopeGate demo run")
     print(f"  gateway        http://127.0.0.1:{gateway_port}")
     print(f"  internal site  http://127.0.0.1:{mock_port}  (private)")
     print(f"  scratch        {tmp}")
@@ -329,7 +329,7 @@ def run() -> int:
                 "no internal server banner or cookie reaches the vendor",
             )
             check('href="/s/dashboard/reports"' in page.text, "links rewritten to stay inside")
-            check('id="vg-bar"' in page.text, "countdown banner injected")
+            check('id="sg-bar"' in page.text, "countdown banner injected")
 
         # 6 -----------------------------------------------------------------
         step(6, "Vendor tries a locked page -> blocked and logged")
@@ -435,7 +435,7 @@ def run() -> int:
         check(token not in blob, "no link token in the audit log")
         check(issued["password"] not in blob, "no vendor password in the audit log")
         check(
-            (vendor.cookies.get("vg_session") or "no-cookie") not in blob,
+            (vendor.cookies.get("sg_session") or "no-cookie") not in blob,
             "no session id in the audit log",
         )
 

@@ -44,7 +44,7 @@ from .grants import (
 )
 from .models import EventType, Grant, GrantStatus, Session, as_utc, utcnow
 
-log = logging.getLogger("vendorgate.vendor")
+log = logging.getLogger("scopegate.vendor")
 
 router = APIRouter()
 
@@ -381,7 +381,7 @@ async def _forward(
             )
             if settings.inject_banner:
                 out = proxy.inject_banner(out, csrf_token=csrf_token, charset=charset)
-        out_headers["X-VendorGate-Seconds-Left"] = str(seconds_left)
+        out_headers["X-ScopeGate-Seconds-Left"] = str(seconds_left)
         return Response(
             content=out,
             status_code=upstream.status_code,

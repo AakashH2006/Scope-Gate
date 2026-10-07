@@ -1,11 +1,11 @@
 """Operator commands.
 
-    python -m vendorgate.cli init-db
-    python -m vendorgate.cli migrate
-    python -m vendorgate.cli create-admin --email you@company.example
-    python -m vendorgate.cli keys
-    python -m vendorgate.cli show-config
-    python -m vendorgate.cli reset-admin-totp --email you@company.example
+    python -m scopegate.cli init-db
+    python -m scopegate.cli migrate
+    python -m scopegate.cli create-admin --email you@company.example
+    python -m scopegate.cli keys
+    python -m scopegate.cli show-config
+    python -m scopegate.cli reset-admin-totp --email you@company.example
 
 ``create-admin`` prints the generated password and the authenticator secret once.
 They are not stored in the clear and cannot be shown again.
@@ -167,7 +167,7 @@ def _show_config(settings: Settings) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="vendorgate", description=__doc__)
+    parser = argparse.ArgumentParser(prog="scopegate", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
 
     sub.add_parser("init-db", help="create the database tables for a fresh database")

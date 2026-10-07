@@ -1,18 +1,18 @@
 [Unit]
-Description=VendorGate restricted vendor access gateway
+Description=ScopeGate restricted vendor access gateway
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=exec
-User=vendorgate
-Group=vendorgate
-WorkingDirectory=/opt/vendorgate
+User=scopegate
+Group=scopegate
+WorkingDirectory=/opt/scopegate
 
 # Secrets live in a file readable only by the service user (section 6.7),
 # never in the repository and never on the command line.
-EnvironmentFile=/etc/vendorgate/vendorgate.env
-ExecStart=/opt/vendorgate/.venv/bin/python -m vendorgate
+EnvironmentFile=/etc/scopegate/scopegate.env
+ExecStart=/opt/scopegate/.venv/bin/python -m scopegate
 
 Restart=always
 RestartSec=2
@@ -32,7 +32,7 @@ LockPersonality=yes
 MemoryDenyWriteExecute=yes
 SystemCallArchitectures=native
 # Only needed when DATABASE_URL points at a local SQLite file:
-ReadWritePaths=/var/lib/vendorgate
+ReadWritePaths=/var/lib/scopegate
 UMask=0077
 
 [Install]

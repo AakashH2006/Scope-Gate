@@ -8,11 +8,11 @@ file is only the things they do not say.
 
 ## Naming
 
-The product is **ScopeGate** (per the logo, `logo.png`). The code, the Python
-package and the GitHub repo are still **vendorgate / Vendor-Gate → Scope-Gate**.
-The interface and the deck say ScopeGate; the code does not. A full rename
-(package dir, config prefixes, CLI, email copy, systemd units) is pending and
-has not been started.
+The product is **ScopeGate** (per the logo, `logo.png`) and so is everything
+else now: the Python package `scopegate/`, the CLI (`python -m scopegate.cli`),
+the cookie names (`sg_admin` / `sg_session`), the email signature, the systemd
+unit and the local database file. The rename was one mechanical commit; nothing
+reads `vendorgate` any more.
 
 Repo: https://github.com/AakashH2006/Scope-Gate (public)
 
@@ -26,7 +26,7 @@ Repo: https://github.com/AakashH2006/Scope-Gate (public)
   ten-step demo script over real HTTP: 47/47 checks.
 - Local run: `python scripts/run_local.py` → gateway on :8000, mock site on
   :9000. Admin credentials are in `admin-credentials.local.txt` (gitignored).
-- Database is a local SQLite file `vendorgate.db` (gitignored). Holds one admin.
+- Database is a local SQLite file `scopegate.db` (gitignored). Holds one admin.
 
 ## Conventions worth keeping
 
@@ -66,16 +66,12 @@ Repo: https://github.com/AakashH2006/Scope-Gate (public)
 3. **Single process.** Admin sessions, the login rate limiter and the expiry
    job are all in memory, so a second uvicorn worker breaks all three. Fine for
    a demo; the first thing to fix if anyone asks about load.
-4. **The ScopeGate rename.** Interface and deck say ScopeGate; the package
-   directory, config prefixes, CLI, email copy and systemd units still say
-   vendorgate. One mechanical commit (see Naming above).
-5. Smaller: no LICENSE (a public repo without one is all rights reserved); one
+4. Smaller: no LICENSE (a public repo without one is all rights reserved); one
    admin with no roles; `/admin` shares a hostname with the vendor routes.
 
 ## Open questions, not yet decided
 
 - Do the mail retries before the AWS deployment, or deploy first?
-- Rename the codebase to ScopeGate now, or leave it until after the demo?
 
 ## The deck
 

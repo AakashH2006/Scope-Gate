@@ -1,11 +1,11 @@
-# Caddy in front of VendorGate: automatic HTTPS, and the only thing listening
+# Caddy in front of ScopeGate: automatic HTTPS, and the only thing listening
 # on the public interface.  Replace the hostname with your own (a free DuckDNS
 # subdomain is enough for the demo).
 #
 #   sudo cp Caddyfile /etc/caddy/Caddyfile
 #   sudo systemctl reload caddy
 
-myvendorgate.duckdns.org {
+myscopegate.duckdns.org {
 	encode zstd gzip
 
 	# Everything goes to the gateway on loopback.  The mock internal site and
@@ -29,7 +29,7 @@ myvendorgate.duckdns.org {
 	}
 
 	log {
-		output file /var/log/caddy/vendorgate.log {
+		output file /var/log/caddy/scopegate.log {
 			roll_size 20mb
 			roll_keep 10
 		}

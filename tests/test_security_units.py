@@ -4,10 +4,10 @@ from __future__ import annotations
 import pyotp
 import pytest
 
-from vendorgate import proxy, security
-from vendorgate.config import Settings
-from vendorgate.events import _scrub
-from vendorgate.ratelimit import SlidingWindowLimiter
+from scopegate import proxy, security
+from scopegate.config import Settings
+from scopegate.events import _scrub
+from scopegate.ratelimit import SlidingWindowLimiter
 
 
 # --- tokens and hashing ----------------------------------------------------- #
@@ -138,7 +138,7 @@ def test_method_allowlist(settings: Settings):
 def test_request_headers_drop_browser_state():
     filtered = proxy.filter_request_headers(
         {
-            "Cookie": "vg_session=abc",
+            "Cookie": "sg_session=abc",
             "Authorization": "Bearer x",
             "Referer": "http://testserver/TOKEN",
             "Origin": "http://testserver",
@@ -236,8 +236,8 @@ def test_banner_goes_inside_body_and_carries_the_csrf_token():
     out = proxy.inject_banner(
         b"<html><body><h1>hi</h1></body></html>", csrf_token="csrf-value"
     ).decode()
-    assert out.index("vg-bar") > out.index("<body>")
-    assert out.index("vg-bar") < out.index("<h1>")
+    assert out.index("sg-bar") > out.index("<body>")
+    assert out.index("sg-bar") < out.index("<h1>")
     assert 'value="csrf-value"' in out
 
 

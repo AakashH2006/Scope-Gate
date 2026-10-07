@@ -37,7 +37,7 @@ from .security import (
     verify_password,
 )
 
-log = logging.getLogger("vendorgate.grants")
+log = logging.getLogger("scopegate.grants")
 
 
 class GrantError(Exception):

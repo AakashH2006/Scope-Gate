@@ -36,7 +36,7 @@ from .mailer import VendorInvite
 from .models import Admin, EventType, GrantStatus, as_utc, utcnow
 from .security import needs_rehash, hash_password, verify_password
 
-log = logging.getLogger("vendorgate.admin")
+log = logging.getLogger("scopegate.admin")
 
 router = APIRouter(prefix="/admin")
 

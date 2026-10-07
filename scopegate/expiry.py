@@ -20,7 +20,7 @@ from .events import log_event, prune_events
 from .grants import sweep_expired
 from .models import EventType
 
-log = logging.getLogger("vendorgate.expiry")
+log = logging.getLogger("scopegate.expiry")
 
 RETENTION_INTERVAL_SECONDS = 3600
 
@@ -37,7 +37,7 @@ class ExpiryWorker:
     def start(self) -> None:
         if self._task is None or self._task.done():
             self._stop = asyncio.Event()
-            self._task = asyncio.create_task(self._run(), name="vendorgate-expiry")
+            self._task = asyncio.create_task(self._run(), name="scopegate-expiry")
 
     async def stop(self) -> None:
         self._stop.set()

@@ -1,4 +1,4 @@
-# VendorGate -- demo build
+# ScopeGate -- demo build
 fastapi>=0.115
 uvicorn[standard]>=0.30
 jinja2>=3.1

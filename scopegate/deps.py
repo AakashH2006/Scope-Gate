@@ -16,10 +16,10 @@ from .security import (
     unsign_cookie,
 )
 
-ADMIN_COOKIE = "vg_admin"
-VENDOR_COOKIE = "vg_session"
-ADMIN_COOKIE_SALT = "vg-admin-cookie"
-VENDOR_COOKIE_SALT = "vg-vendor-cookie"
+ADMIN_COOKIE = "sg_admin"
+VENDOR_COOKIE = "sg_session"
+ADMIN_COOKIE_SALT = "sg-admin-cookie"
+VENDOR_COOKIE_SALT = "sg-vendor-cookie"
 
 #: The admin session is confirmed as "fresh" for this long after a successful
 #: master-password step-up, so creating several grants in a row is not painful

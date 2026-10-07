@@ -1,6 +1,6 @@
 """Alembic environment, wired to the app's own configuration.
 
-The connection string comes from ``DATABASE_URL`` (via vendorgate.config), so a
+The connection string comes from ``DATABASE_URL`` (via scopegate.config), so a
 migration always runs against the same database the gateway uses and no
 credentials live in alembic.ini.  Both the async drivers (aiosqlite, asyncpg)
 are supported.
@@ -19,8 +19,8 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from vendorgate.config import get_settings  # noqa: E402
-from vendorgate.models import Base  # noqa: E402
+from scopegate.config import get_settings  # noqa: E402
+from scopegate.models import Base  # noqa: E402
 
 config = context.config
 if config.config_file_name is not None:

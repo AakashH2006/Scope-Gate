@@ -118,7 +118,7 @@ def build_settings() -> Settings:
 
     return Settings(
         public_url=os.getenv("PUBLIC_URL", "http://127.0.0.1:8000").rstrip("/"),
-        database_url=os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./vendorgate.db"),
+        database_url=os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./scopegate.db"),
         secret_key=secret_key,
         totp_enc_key=os.getenv("TOTP_ENC_KEY", ""),
         link_ttl_minutes=_int("LINK_TTL_MINUTES", 180),
@@ -147,7 +147,7 @@ def build_settings() -> Settings:
         smtp_port=_int("SMTP_PORT", 587),
         smtp_user=os.getenv("SMTP_USER", ""),
         smtp_password=os.getenv("SMTP_PASSWORD", ""),
-        mail_from=os.getenv("MAIL_FROM", os.getenv("SMTP_USER", "vendorgate@localhost")),
+        mail_from=os.getenv("MAIL_FROM", os.getenv("SMTP_USER", "scopegate@localhost")),
         secure_cookies=_bool("SECURE_COOKIES", not os.getenv("PUBLIC_URL", "").startswith("http://")),
         trust_forwarded_for=_bool("TRUST_FORWARDED_FOR", True),
     )

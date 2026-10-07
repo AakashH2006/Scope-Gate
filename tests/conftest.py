@@ -16,11 +16,11 @@ import pytest
 from fastapi.testclient import TestClient
 
 from mocksite.app import create_app as create_mocksite
-from vendorgate.app import create_app
-from vendorgate.config import Settings
-from vendorgate.db import create_all, dispose_engine, init_engine, session_scope
-from vendorgate.models import Admin, utcnow
-from vendorgate.security import (
+from scopegate.app import create_app
+from scopegate.config import Settings
+from scopegate.db import create_all, dispose_engine, init_engine, session_scope
+from scopegate.models import Admin, utcnow
+from scopegate.security import (
     encrypt_totp_secret,
     generate_totp_enc_key,
     generate_totp_secret,
@@ -47,7 +47,7 @@ class AdminCreds:
 
 @pytest.fixture
 def settings(tmp_path: Path) -> Settings:
-    db_path = (tmp_path / "vendorgate.db").as_posix()
+    db_path = (tmp_path / "scopegate.db").as_posix()
     return Settings(
         public_url="http://testserver",
         database_url=f"sqlite+aiosqlite:///{db_path}",

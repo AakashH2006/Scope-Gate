@@ -20,7 +20,7 @@ sys.path.insert(0, str(ROOT))
 
 import uvicorn  # noqa: E402  (after sys.path)
 
-from vendorgate.config import get_settings  # noqa: E402
+from scopegate.config import get_settings  # noqa: E402
 
 
 async def main() -> None:
@@ -29,11 +29,11 @@ async def main() -> None:
 
     if not Path(".env").is_file():
         print("No .env found -- using built-in local defaults.")
-        print("Run `python -m vendorgate.cli keys` and copy .env.example to .env")
+        print("Run `python -m scopegate.cli keys` and copy .env.example to .env")
         print("for a setup that survives a restart.\n")
 
     from mocksite.app import create_app as create_mocksite
-    from vendorgate.app import create_app
+    from scopegate.app import create_app
 
     mock = uvicorn.Server(
         uvicorn.Config(

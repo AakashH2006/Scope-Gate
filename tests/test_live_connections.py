@@ -24,7 +24,7 @@ from starlette.websockets import WebSocketDisconnect
 
 from mocksite.app import create_app as create_mocksite
 from tests.conftest import ADMIN_PASSWORD
-from vendorgate.app import create_app
+from scopegate.app import create_app
 
 pytestmark = pytest.mark.integration
 
@@ -207,9 +207,9 @@ def test_expiry_also_cuts_a_live_websocket(live_client, live_app, signed_in):
 
     from sqlalchemy import select
 
-    from vendorgate.db import session_scope
-    from vendorgate.grants import sweep_expired
-    from vendorgate.models import Grant
+    from scopegate.db import session_scope
+    from scopegate.grants import sweep_expired
+    from scopegate.models import Grant
 
     _, public_id = signed_in
 

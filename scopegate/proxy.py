@@ -21,7 +21,7 @@ import httpx
 
 from .config import Settings
 
-log = logging.getLogger("vendorgate.proxy")
+log = logging.getLogger("scopegate.proxy")
 
 #: Where the proxied area lives in the gateway's own URL space.
 MOUNT = "/s"
@@ -402,11 +402,11 @@ def is_html(content_type: str) -> bool:
 # --------------------------------------------------------------------------- #
 
 BANNER_TEMPLATE = """
-<div id="vg-bar" style="position:fixed;top:0;left:0;right:0;z-index:2147483647;
+<div id="sg-bar" style="position:fixed;top:0;left:0;right:0;z-index:2147483647;
  font:13px/1.5 system-ui,-apple-system,Segoe UI,sans-serif;background:#111827;color:#f9fafb;
  padding:7px 14px;display:flex;gap:14px;align-items:center;box-shadow:0 1px 4px rgba(0,0,0,.3)">
   <strong style="font-weight:600">Temporary vendor access</strong>
-  <span id="vg-left" style="font-variant-numeric:tabular-nums">--:--</span>
+  <span id="sg-left" style="font-variant-numeric:tabular-nums">--:--</span>
   <span style="flex:1"></span>
   <form method="post" action="/s/logout" style="margin:0">
     <input type="hidden" name="csrf" value="__CSRF__">
@@ -417,7 +417,7 @@ BANNER_TEMPLATE = """
 <div style="height:34px"></div>
 <script>
 (function(){
-  var el=document.getElementById('vg-left');
+  var el=document.getElementById('sg-left');
   function fmt(s){var m=Math.floor(s/60),x=s%60;return m+':'+(x<10?'0':'')+x;}
   function tick(){
     fetch('/s/_status',{cache:'no-store'}).then(function(r){

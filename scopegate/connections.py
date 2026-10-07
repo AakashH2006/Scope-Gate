@@ -11,7 +11,7 @@ import asyncio
 import logging
 from collections import defaultdict
 
-log = logging.getLogger("vendorgate.connections")
+log = logging.getLogger("scopegate.connections")
 
 
 class LiveConnections:

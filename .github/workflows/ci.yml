@@ -41,7 +41,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: Lint
-        run: python -m pyflakes vendorgate mocksite tests scripts
+        run: python -m pyflakes scopegate mocksite tests scripts
 
       - name: Unit and integration tests
         # The integration tests bind loopback ports and run uvicorn in threads,
@@ -60,7 +60,7 @@ jobs:
           DATABASE_URL: sqlite+aiosqlite:///./ci-check.db
           SECRET_KEY: ci-only-key-not-used-for-anything-real-0123456789
         run: |
-          python -m vendorgate.cli init-db
+          python -m scopegate.cli init-db
           python -m alembic check
 
   hygiene:

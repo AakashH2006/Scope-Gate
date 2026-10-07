@@ -1,4 +1,4 @@
-# Vendor Gateway (working name: VendorGate)
+# ScopeGate
 
 [![CI](https://github.com/AakashH2006/Scope-Gate/actions/workflows/ci.yml/badge.svg)](https://github.com/AakashH2006/Scope-Gate/actions/workflows/ci.yml)
 
@@ -41,7 +41,7 @@ A second, restricted gateway that lets an outside vendor use a few specific page
 
 Vendors (contractors, support partners, auditors) sometimes need to look at one or two internal pages. Giving them a VPN account puts them *inside* the network, which is far more access than they need and hard to take back.
 
-VendorGate sits **outside** the network as a reverse proxy. The admin issues a time-limited grant for one vendor email address. The vendor receives a temporary link and a password. After logging in, the vendor sees only the pages the admin allowed, served through the gateway. The vendor never gets network access, a VPN client, or a direct route to the internal site.
+ScopeGate sits **outside** the network as a reverse proxy. The admin issues a time-limited grant for one vendor email address. The vendor receives a temporary link and a password. After logging in, the vendor sees only the pages the admin allowed, served through the gateway. The vendor never gets network access, a VPN client, or a direct route to the internal site.
 
 When the time is up, or the admin revokes the grant, the session ends immediately.
 
@@ -281,7 +281,7 @@ All via environment variables (names are suggestions):
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `PUBLIC_URL` | - | e.g. `https://myvendorgate.duckdns.org` |
+| `PUBLIC_URL` | - | e.g. `https://myscopegate.duckdns.org` |
 | `DATABASE_URL` | - | Postgres connection string |
 | `SECRET_KEY` | - | Signs sessions |
 | `TOTP_ENC_KEY` | - | Encrypts TOTP secrets |

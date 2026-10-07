@@ -12,26 +12,26 @@ security group.
 
 ```bash
 sudo apt update && sudo apt install -y python3-venv git
-sudo useradd --system --home /opt/vendorgate vendorgate
+sudo useradd --system --home /opt/scopegate scopegate
 sudo useradd --system --no-create-home mocksite
-sudo mkdir -p /opt/vendorgate /var/lib/vendorgate /etc/vendorgate
-sudo chown vendorgate:vendorgate /var/lib/vendorgate
+sudo mkdir -p /opt/scopegate /var/lib/scopegate /etc/scopegate
+sudo chown scopegate:scopegate /var/lib/scopegate
 ```
 
-Copy the project to `/opt/vendorgate`, then:
+Copy the project to `/opt/scopegate`, then:
 
 ```bash
-cd /opt/vendorgate
-sudo -u vendorgate python3 -m venv .venv
-sudo -u vendorgate .venv/bin/pip install -r requirements.txt
+cd /opt/scopegate
+sudo -u scopegate python3 -m venv .venv
+sudo -u scopegate .venv/bin/pip install -r requirements.txt
 ```
 
 ## 2. Secrets
 
 ```bash
-.venv/bin/python -m vendorgate.cli keys        # prints SECRET_KEY and TOTP_ENC_KEY
-sudo install -m 600 -o root -g vendorgate /dev/null /etc/vendorgate/vendorgate.env
-sudo nano /etc/vendorgate/vendorgate.env       # see .env.example for every key
+.venv/bin/python -m scopegate.cli keys         # prints SECRET_KEY and TOTP_ENC_KEY
+sudo install -m 600 -o root -g scopegate /dev/null /etc/scopegate/scopegate.env
+sudo nano /etc/scopegate/scopegate.env        # see .env.example for every key
 ```
 
 The file must stay `0600` and owned so that only the service user can read it
@@ -46,26 +46,26 @@ The gateway **refuses to start** if `PUBLIC_URL` is not local and `SECRET_KEY`,
 SQLite (simplest):
 
 ```
-DATABASE_URL=sqlite+aiosqlite:////var/lib/vendorgate/vendorgate.db
+DATABASE_URL=sqlite+aiosqlite:////var/lib/scopegate/scopegate.db
 ```
 
 RDS Postgres (free tier, not publicly accessible, same VPC, security group open
 only to the instance):
 
 ```
-DATABASE_URL=postgresql+asyncpg://vendorgate:PASSWORD@your-db.rds.amazonaws.com:5432/vendorgate
+DATABASE_URL=postgresql+asyncpg://scopegate:PASSWORD@your-db.rds.amazonaws.com:5432/scopegate
 ```
 
 Then create the schema and the admin account:
 
 ```bash
 # fresh database -- creates the tables and stamps the Alembic revision
-sudo -u vendorgate .venv/bin/python -m vendorgate.cli init-db
+sudo -u scopegate .venv/bin/python -m scopegate.cli init-db
 
 # on every later deploy, before restarting the service
-sudo -u vendorgate .venv/bin/python -m vendorgate.cli migrate
+sudo -u scopegate .venv/bin/python -m scopegate.cli migrate
 
-sudo -u vendorgate .venv/bin/python -m vendorgate.cli create-admin --email you@company.example
+sudo -u scopegate .venv/bin/python -m scopegate.cli create-admin --email you@company.example
 ```
 
 That prints the password and the authenticator provisioning URI **once**. Add it
@@ -74,10 +74,10 @@ to an authenticator app before closing the terminal.
 ## 4. Services
 
 ```bash
-sudo cp deploy/vendorgate.service deploy/mocksite.service /etc/systemd/system/
+sudo cp deploy/scopegate.service deploy/mocksite.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now mocksite vendorgate
-sudo systemctl status vendorgate
+sudo systemctl enable --now mocksite scopegate
+sudo systemctl status scopegate
 ```
 
 ## 5. Caddy and DNS
@@ -110,7 +110,7 @@ Then walk the demo script in section 12 of the main README, or run
 - **One process.** Admin sessions and the login rate limiter live in memory, and
   the expiry job runs in-process. Running several uvicorn workers would give each
   worker its own copy of all three; move them to the database or Redis first.
-- **Schema upgrades**: run `vendorgate.cli migrate` before restarting the
+- **Schema upgrades**: run `scopegate.cli migrate` before restarting the
   service after a deploy. The app itself does not migrate on startup, so a
   rollback never finds a schema from the future.
 - **Log retention** is enforced by the hourly job inside the gateway

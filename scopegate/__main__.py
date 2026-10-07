@@ -1,4 +1,4 @@
-"""``python -m vendorgate`` runs the gateway with uvicorn."""
+"""``python -m scopegate`` runs the gateway with uvicorn."""
 from __future__ import annotations
 
 import os

@@ -22,7 +22,7 @@ from .mailer import Mailer
 from .ratelimit import SlidingWindowLimiter
 from .security import derive_fernet_key_from_secret
 
-log = logging.getLogger("vendorgate")
+log = logging.getLogger("scopegate")
 
 HERE = Path(__file__).parent
 
@@ -95,7 +95,7 @@ def create_app(
         if start_worker:
             app.state.worker.start()
         log.info(
-            "VendorGate ready: public=%s upstream=%s pages=%s",
+            "ScopeGate ready: public=%s upstream=%s pages=%s",
             settings.public_url,
             settings.upstream_url,
             ",".join(settings.allowed_pages),
@@ -110,7 +110,7 @@ def create_app(
             await dispose_engine()
 
     app = FastAPI(
-        title="VendorGate",
+        title="ScopeGate",
         description="Restricted vendor access gateway (demo build)",
         version="0.1.0",
         lifespan=lifespan,

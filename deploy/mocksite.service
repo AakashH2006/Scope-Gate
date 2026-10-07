@@ -1,19 +1,19 @@
 [Unit]
-Description=Mock internal dashboard (VendorGate demo target)
+Description=Mock internal dashboard (ScopeGate demo target)
 After=network-online.target
 
 [Service]
 Type=exec
 User=mocksite
 Group=mocksite
-WorkingDirectory=/opt/vendorgate
+WorkingDirectory=/opt/scopegate
 
 # Loopback only.  The whole point of the demo is that the internet can reach
 # this app only through the gateway, so it must never bind 0.0.0.0.
 Environment=MOCKSITE_HOST=127.0.0.1
 Environment=MOCKSITE_PORT=9000
 Environment=MOCKSITE_SELF_URL=http://127.0.0.1:9000
-ExecStart=/opt/vendorgate/.venv/bin/python -m mocksite.app
+ExecStart=/opt/scopegate/.venv/bin/python -m mocksite.app
 
 Restart=always
 RestartSec=2

@@ -1,9 +1,9 @@
-# Running VendorGate
+# Running ScopeGate
 
 The plan is in [README.md](README.md). This is how to run what has been built.
 
 ```
-vendorgate/          the gateway: auth, grants, proxy, expiry, audit log
+scopegate/           the gateway: auth, grants, proxy, expiry, audit log
 mocksite/            the mock internal dashboard (the demo target)
 migrations/          Alembic revisions
 tests/               88 tests, including the checklist in section 14
@@ -18,12 +18,12 @@ deploy/              Caddyfile, systemd units, deployment notes
 python -m pip install -r requirements.txt
 
 # 1. keys and configuration
-python -m vendorgate.cli keys          # prints SECRET_KEY and TOTP_ENC_KEY
+python -m scopegate.cli keys           # prints SECRET_KEY and TOTP_ENC_KEY
 cp .env.example .env                   # paste the two keys into it
 
 # 2. database and the admin account
-python -m vendorgate.cli init-db       # fresh database: create and stamp
-python -m vendorgate.cli create-admin --email you@company.example
+python -m scopegate.cli init-db        # fresh database: create and stamp
+python -m scopegate.cli create-admin --email you@company.example
 #    -> prints the password and an otpauth:// URI. Add it to an authenticator
 #       app now; neither is shown again.
 
@@ -55,9 +55,9 @@ pitch.
 ## The commands you will actually use
 
 ```bash
-python -m vendorgate.cli show-config        # the effective configuration
-python -m vendorgate.cli migrate            # apply pending migrations
-python -m vendorgate.cli reset-admin-totp --email you@company.example
+python -m scopegate.cli show-config         # the effective configuration
+python -m scopegate.cli migrate             # apply pending migrations
+python -m scopegate.cli reset-admin-totp --email you@company.example
 ```
 
 ## Schema changes
@@ -66,12 +66,12 @@ The schema is under Alembic. `init-db` creates it on a fresh database and
 stamps the current revision, so the two paths do not diverge; on an existing
 database, `migrate` applies what is pending.
 
-After changing `vendorgate/models.py`:
+After changing `scopegate/models.py`:
 
 ```bash
 python -m alembic revision --autogenerate -m "what changed"
 python -m alembic check          # should say no new operations
-python -m vendorgate.cli migrate
+python -m scopegate.cli migrate
 ```
 
 `DATABASE_URL` drives it, so a revision always runs against the same database

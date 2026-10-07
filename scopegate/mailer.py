@@ -26,7 +26,7 @@ from typing import Callable
 
 from .config import Settings
 
-log = logging.getLogger("vendorgate.mail")
+log = logging.getLogger("scopegate.mail")
 
 #: Called as ``callback(ok, detail)`` once the send attempt finishes.
 SendCallback = Callable[[bool, str], None]
@@ -80,13 +80,13 @@ How it works:
 If the link has expired or you need more time, reply to the person who arranged
 this access and they can issue a new link.
 
--- VendorGate
+-- ScopeGate
 """
     msg = EmailMessage()
     msg["Subject"] = "Your temporary access link"
     msg["To"] = invite.vendor_email
     msg["Date"] = formatdate(localtime=True)
-    msg["Message-ID"] = make_msgid(domain="vendorgate.local")
+    msg["Message-ID"] = make_msgid(domain="scopegate.local")
     msg.set_content(body)
     return msg
 
@@ -101,11 +101,11 @@ class Mailer:
 
     def send_invite_async(self, invite: VendorInvite, on_done: SendCallback) -> None:
         msg = render_invite(invite)
-        msg["From"] = self.settings.mail_from or "vendorgate@localhost"
+        msg["From"] = self.settings.mail_from or "scopegate@localhost"
         thread = threading.Thread(
             target=self._send_and_report,
             args=(msg, on_done),
-            name="vendorgate-mail",
+            name="scopegate-mail",
             daemon=True,
         )
         self._threads.append(thread)
@@ -114,7 +114,7 @@ class Mailer:
     def send_invite_blocking(self, invite: VendorInvite) -> tuple[bool, str]:
         """Same send, inline.  Used by the tests and the CLI."""
         msg = render_invite(invite)
-        msg["From"] = self.settings.mail_from or "vendorgate@localhost"
+        msg["From"] = self.settings.mail_from or "scopegate@localhost"
         return self._send(msg)
 
     def join(self, timeout: float = 10.0) -> None:
@@ -136,9 +136,9 @@ class Mailer:
             if self.backend == "smtp":
                 return self._send_smtp(msg)
             if self.backend == "console":
-                print("----- VendorGate outgoing mail -----")
+                print("----- ScopeGate outgoing mail -----")
                 print(msg.get_content())
-                print("------------------------------------")
+                print("-----------------------------------")
                 return True, "console backend"
             return self._send_file(msg)
         except Exception as exc:  # noqa: BLE001 -- the reason goes to the audit log
