@@ -53,32 +53,51 @@ def _format_duration(minutes: int) -> str:
 
 
 def render_invite(invite: VendorInvite) -> EmailMessage:
-    """Plain-text only: no tracking pixels, no external images (section 9)."""
+    """Plain-text only: no tracking pixels, no external images (section 9).
+
+    Laid out for a mail client that renders text/plain in a proportional font,
+    which Gmail does: upper-case section headings and one fact per line, rather
+    than space-aligned columns that would come out ragged.  The link sits alone
+    on its line so clients auto-link it without swallowing punctuation.
+    """
     pages = "\n".join(f"  - {p}" for p in invite.allowed_paths)
     expires = invite.link_expires_at.strftime("%Y-%m-%d %H:%M UTC")
+    duration = _format_duration(invite.duration_minutes)
     body = f"""Hello,
 
-You have been given temporary access to a small number of pages of an internal
-web application. You do not need to install anything -- a browser is enough.
+You have been given access to a few pages of an internal web application, for
+a limited time. There is nothing to install -- a browser is all you need.
 
-Your link:
-  {invite.link}
 
-Your password:
-  {invite.password}
+YOUR LINK
 
-How it works:
-  - Open the link and sign in with your email address ({invite.vendor_email})
-    and the password above.
-  - The link must be used before {expires}. After that it stops working.
-  - Once you sign in, your access lasts {_format_duration(invite.duration_minutes)}.
-    The clock starts at sign-in, not now.
-  - The link works on one device only: whichever browser signs in first.
-  - You will be able to reach these pages and nothing else:
+{invite.link}
+
+
+SIGNING IN
+
+Email address: {invite.vendor_email}
+Password: {invite.password}
+
+Open the link before {expires}, or it stops working and you
+will need a new one.
+
+Your access then lasts {duration}, counted from the moment you sign in
+rather than from now.
+
+The first browser to sign in keeps the access. A later sign-in from anywhere
+else is refused, so use the device you mean to work on.
+
+
+WHAT YOU CAN REACH
+
 {pages}
 
-If the link has expired or you need more time, reply to the person who arranged
-this access and they can issue a new link.
+Nothing else is reachable, and this is not network or VPN access.
+
+
+If the link has expired, or you need more time or another page, reply to the
+person who arranged this access -- they can issue a new one.
 
 -- ScopeGate
 """
