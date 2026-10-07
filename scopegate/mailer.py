@@ -91,6 +91,51 @@ this access and they can issue a new link.
     return msg
 
 
+def verify_smtp_login(settings: Settings) -> tuple[bool, str]:
+    """Check the SMTP credentials without sending a message.
+
+    Pins a single auth mechanism deliberately.  ``smtplib.login`` walks the
+    server's advertised list, so a PLAIN rejected with 535 is retried as LOGIN,
+    Gmail hangs up, and the useful reason is replaced by a bare
+    ``SMTPServerDisconnected``.  One mechanism keeps the server's own text --
+    and unlike ``set_debuglevel``, nothing here logs the credentials.
+    """
+    if settings.mail_backend != "smtp":
+        return False, f"MAIL_BACKEND is {settings.mail_backend!r}, not 'smtp': nothing to check"
+    if not settings.smtp_host:
+        return False, "SMTP_HOST is not set"
+    if not settings.smtp_user:
+        return False, "SMTP_USER is not set"
+    if not settings.smtp_password:
+        return False, "SMTP_PASSWORD is not set"
+
+    target = f"{settings.smtp_host}:{settings.smtp_port} as {settings.smtp_user}"
+    context = ssl.create_default_context()
+    try:
+        if settings.smtp_port == 465:
+            smtp = smtplib.SMTP_SSL(
+                settings.smtp_host, settings.smtp_port, context=context, timeout=30
+            )
+        else:
+            smtp = smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=30)
+        with smtp:
+            smtp.ehlo()
+            if settings.smtp_port != 465:
+                smtp.starttls(context=context)
+                smtp.ehlo()
+            smtp.user, smtp.password = settings.smtp_user, settings.smtp_password
+            try:
+                smtp.auth("PLAIN", smtp.auth_plain)
+            except smtplib.SMTPResponseException as exc:
+                reason = exc.smtp_error
+                if isinstance(reason, bytes):
+                    reason = reason.decode(errors="replace")
+                return False, f"{target}: rejected {exc.smtp_code}: {reason}"
+    except Exception as exc:  # noqa: BLE001 -- the reason is the whole point
+        return False, f"{target}: {type(exc).__name__}: {exc}"
+    return True, f"{target}: login accepted, nothing was sent"
+
+
 class Mailer:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings

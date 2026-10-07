@@ -4,7 +4,7 @@ from __future__ import annotations
 import pyotp
 import pytest
 
-from scopegate import proxy, security
+from scopegate import mailer, proxy, security
 from scopegate.config import Settings
 from scopegate.events import _scrub
 from scopegate.ratelimit import SlidingWindowLimiter
@@ -347,3 +347,126 @@ def test_hiding_links_is_not_the_access_control(settings):
                 allowed_prefixes=NAV_ALLOWED,
                 settings=replace(settings, blocked_links=mode),
             )
+
+
+# --------------------------------------------------------------------------- #
+# verify_smtp_login -- the credential check that sends nothing
+# --------------------------------------------------------------------------- #
+
+class _StubSMTP:
+    """Stands in for smtplib.SMTP.  Records the conversation; sends no mail."""
+
+    instances: list["_StubSMTP"] = []
+
+    def __init__(self, host, port, timeout=None, context=None):
+        self.host, self.port = host, port
+        self.calls: list[str] = []
+        self.user = self.password = None
+        self.auth_error: Exception | None = None
+        _StubSMTP.instances.append(self)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.calls.append("close")
+        return False
+
+    def ehlo(self):
+        self.calls.append("ehlo")
+
+    def starttls(self, context=None):
+        self.calls.append("starttls")
+
+    def auth_plain(self, challenge=None):
+        return "stub"
+
+    def auth(self, mechanism, authobject, **kwargs):
+        self.calls.append(f"auth:{mechanism}")
+        if self.auth_error is not None:
+            raise self.auth_error
+        return 235, b"2.7.0 Accepted"
+
+
+def _smtp_settings(**over):
+    base = dict(
+        mail_backend="smtp",
+        smtp_host="smtp.example.com",
+        smtp_port=587,
+        smtp_user="sender@example.com",
+        smtp_password="apppasswordhere",
+    )
+    base.update(over)
+    return Settings(**base)
+
+
+def _patch_smtp(monkeypatch, error=None, cls_name="SMTP"):
+    _StubSMTP.instances = []
+
+    def factory(*args, **kwargs):
+        stub = _StubSMTP(*args, **kwargs)
+        stub.auth_error = error
+        return stub
+
+    monkeypatch.setattr(mailer.smtplib, cls_name, factory)
+    return _StubSMTP.instances
+
+
+def test_verify_smtp_login_accepts_working_credentials(monkeypatch):
+    instances = _patch_smtp(monkeypatch)
+    ok, detail = mailer.verify_smtp_login(_smtp_settings())
+    assert ok, detail
+    assert "nothing was sent" in detail
+    assert "sender@example.com" in detail
+    # STARTTLS before the credentials go anywhere, and only one mechanism tried.
+    assert instances[0].calls == ["ehlo", "starttls", "ehlo", "auth:PLAIN", "close"]
+
+
+def test_verify_smtp_login_reports_the_servers_own_refusal(monkeypatch):
+    """A 535 must survive: smtplib.login would mask it by retrying another
+    mechanism until the server hung up."""
+    import smtplib
+
+    refusal = smtplib.SMTPResponseException(
+        535, b"5.7.8 Username and Password not accepted"
+    )
+    _patch_smtp(monkeypatch, error=refusal)
+    ok, detail = mailer.verify_smtp_login(_smtp_settings())
+    assert not ok
+    assert "535" in detail
+    assert "Username and Password not accepted" in detail
+
+
+def test_verify_smtp_login_never_puts_the_password_in_the_message(monkeypatch):
+    import smtplib
+
+    secret = "sixteenlowercase"
+    for error in (None, smtplib.SMTPResponseException(535, b"nope"),
+                  OSError("connection reset")):
+        _patch_smtp(monkeypatch, error=error)
+        _, detail = mailer.verify_smtp_login(_smtp_settings(smtp_password=secret))
+        assert secret not in detail
+
+
+def test_verify_smtp_login_skips_starttls_on_465(monkeypatch):
+    instances = _patch_smtp(monkeypatch, cls_name="SMTP_SSL")
+    ok, _ = mailer.verify_smtp_login(_smtp_settings(smtp_port=465))
+    assert ok
+    assert "starttls" not in instances[0].calls
+
+
+def test_verify_smtp_login_refuses_an_incomplete_configuration():
+    assert mailer.verify_smtp_login(_smtp_settings(mail_backend="file"))[1].startswith(
+        "MAIL_BACKEND is 'file'"
+    )
+    for missing in ("smtp_host", "smtp_user", "smtp_password"):
+        ok, detail = mailer.verify_smtp_login(_smtp_settings(**{missing: ""}))
+        assert not ok
+        assert missing.upper() in detail
+
+
+def test_verify_smtp_login_turns_a_dead_connection_into_a_reason(monkeypatch):
+    _patch_smtp(monkeypatch, error=OSError("connection reset by peer"))
+    ok, detail = mailer.verify_smtp_login(_smtp_settings())
+    assert not ok
+    assert "OSError" in detail and "connection reset by peer" in detail

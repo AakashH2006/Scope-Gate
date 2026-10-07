@@ -159,7 +159,14 @@ Two things bite here, and neither shows up until a vendor is waiting:
   **verified** addresses, silently dropping the rest. Verify the vendor address
   you will demo with, or request production access first.
 
-Send one real invite to yourself before the demo. A failure writes an
+Check the credentials before anything depends on them -- this connects, logs in
+and sends nothing:
+
+```bash
+sudo -u scopegate .venv/bin/python -m scopegate.cli check-mail
+```
+
+Then send one real invite to yourself before the demo. A failure writes an
 `email_failed` audit row and the dashboard flags it; the grant's **Resend**
 button issues a new link and password once the cause is fixed.
 

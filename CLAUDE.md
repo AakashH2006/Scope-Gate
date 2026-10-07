@@ -20,9 +20,9 @@ Repo: https://github.com/AakashH2006/Scope-Gate (public)
 
 - Build-plan steps 1–9 and 11 done. **Step 10 (AWS deployment) has never been
   run** — everything in `deploy/` is reviewed-but-untested config.
-- CI runs lint, the 112 tests, the demo script and an `alembic check` on
+- CI runs lint, the 118 tests, the demo script and an `alembic check` on
   3.12 and 3.13, plus a job that fails if a secret file is ever tracked.
-- 112 tests pass (`python -m pytest`). `python scripts/demo_run.py` walks the
+- 118 tests pass (`python -m pytest`). `python scripts/demo_run.py` walks the
   ten-step demo script over real HTTP: 47/47 checks (the resend button is
   covered by pytest, not by the demo script).
 - Local run: `python scripts/run_local.py` → gateway on :8000, mock site on

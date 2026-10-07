@@ -5,6 +5,7 @@
     python -m scopegate.cli create-admin --email you@company.example
     python -m scopegate.cli keys
     python -m scopegate.cli show-config
+    python -m scopegate.cli check-mail
     python -m scopegate.cli reset-admin-totp --email you@company.example
 
 ``create-admin`` prints the generated password and the authenticator secret once.
@@ -29,6 +30,7 @@ from .db import (
     init_engine,
     session_scope,
 )
+from .mailer import verify_smtp_login
 from .models import Admin, utcnow
 from .security import (
     derive_fernet_key_from_secret,
@@ -184,6 +186,10 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("migrate", help="apply pending migrations (alembic upgrade head)")
     sub.add_parser("keys", help="print fresh SECRET_KEY and TOTP_ENC_KEY values")
     sub.add_parser("show-config", help="print the effective configuration")
+    sub.add_parser(
+        "check-mail",
+        help="verify the SMTP credentials without sending a message",
+    )
 
     create = sub.add_parser("create-admin", help="create the admin account")
     create.add_argument("--email", required=True)
@@ -207,6 +213,19 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "show-config":
         _show_config(settings)
         return 0
+    if args.command == "check-mail":
+        ok, detail = verify_smtp_login(settings)
+        print(detail)
+        if not ok:
+            # The two that actually happen, worth naming rather than looking up.
+            print(
+                "\n535 means the credentials are not valid for this account. A Gmail "
+                "app\npassword only works for the account that created it, and that "
+                "account needs\n2-Step Verification on. Signed in to several Google "
+                "accounts at once? The app\npassword page acts on the default one, "
+                "which may not be the one you meant."
+            )
+        return 0 if ok else 1
     if args.command == "init-db":
         asyncio.run(_init_db(settings))
         return 0
