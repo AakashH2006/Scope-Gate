@@ -159,6 +159,16 @@ def _show_config(settings: Settings) -> None:
     print("MAX_ACCESS_MINUTES", settings.max_access_minutes)
     print("MAX_LOGIN_ATTEMPTS", settings.max_login_attempts)
     print("MAIL_BACKEND      ", settings.mail_backend)
+    if settings.mail_backend == "smtp":
+        # Enough to tell a loaded SMTP block from a missing one, and to show which
+        # address Gmail will rewrite From to.  The password is never printed.
+        print("SMTP_HOST         ", settings.smtp_host or "(not set)")
+        print("SMTP_PORT         ", settings.smtp_port)
+        print("SMTP_USER         ", settings.smtp_user or "(not set)")
+        print("SMTP_PASSWORD set  ", "yes" if settings.smtp_password else "no")
+        print("MAIL_FROM         ", settings.mail_from or "(not set)")
+    else:
+        print("MAIL_OUTBOX_DIR   ", settings.mail_outbox_dir)
     print("LOG_DASHBOARD_DAYS", settings.log_dashboard_days)
     print("LOG_RETENTION_DAYS", settings.log_retention_days)
     print("SECURE_COOKIES    ", settings.secure_cookies)
