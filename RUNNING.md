@@ -160,7 +160,7 @@ Decisions taken while building, that the plan left open:
 
 ## Open items from the plan
 
-Unchanged, and still open (section 16):
+Unchanged, and still open (section 17):
 
 1. The link and the password travel in the same email. Accepted for the demo.
 2. Per-site action restrictions: the default is read-only (`GET`, `HEAD`), set

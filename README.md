@@ -32,8 +32,9 @@ A second, restricted gateway that lets an outside vendor use a few specific page
 13. [Build plan](#13-build-plan)
 14. [Test checklist](#14-test-checklist)
 15. [Future / client version](#15-future--client-version)
-16. [Open items](#16-open-items)
-17. [Known limitations](#17-known-limitations)
+16. [Hiding the internal site from the gateway](#16-hiding-the-internal-site-from-the-gateway-proposed)
+17. [Open items](#17-open-items)
+18. [Known limitations](#18-known-limitations)
 
 ---
 
@@ -270,7 +271,7 @@ Unknown, expired or revoked tokens all return the same neutral "link not valid" 
 - The admin is told on the dashboard if sending fails (`email_failed`).
 - **Resend.** Only the hashes of the link and password are kept, so a failed send cannot be repeated - it can only be replaced. A `pending` grant has a **Resend** button that mints a new link and password, invalidates the old ones and emails the vendor again, logging `invite_resent`. It needs the master password, because it issues a working credential.
 - **Automatic retry.** A failed send is retried on the same worker thread, `MAIL_RETRY_ATTEMPTS` times in total (3 by default) with the gap doubling from `MAIL_RETRY_BACKOFF_SECONDS` (5s, then 10s), because the usual causes - a rate limit, a mail server restarting - clear on their own given a little longer. Only the final outcome is logged, so one invite nobody received is one `email_failed` row rather than three, and the dashboard count stays a count of vendors left waiting. The retried message is held in memory on that thread and nowhere else: it contains a live vendor password, so a queue on disk or in the database would put a working credential at rest. The cost is that a restart part-way through forgets the invite, which is what **Resend** is for.
-- **Open item:** the link and password travel in the same email. This is accepted for the demo and flagged for later (see section 16).
+- **Open item:** the link and password travel in the same email. This is accepted for the demo and flagged for later (see section 17).
 
 ## 10. Logging and retention
 
@@ -384,7 +385,7 @@ It exists to show the gateway letting some pages through and refusing others.
 Not part of the demo; to be designed once a client is signed.
 
 - **Multiple companies (multi-tenant) or one deployment per company.** Decide shared service vs separate deployments.
-- **Customer-side connector.** A small agent installed in the customer's network that opens an *outbound* connection to the gateway, so the customer opens no inbound firewall ports. The alternative is a site-to-site VPN per customer.
+- **Customer-side connector.** A small agent installed in the customer's network that opens an *outbound* connection to the gateway, so the customer opens no inbound firewall ports. The alternative is a site-to-site VPN per customer. Section 16 is the fuller design, where the same connector also keeps the internal address off the gateway entirely.
 - **Custom domains** such as `vendors.customer.com`.
 - **Amazon SES** with a verified domain for production email.
 - Several separate internal sites per vendor (not just sub-pages of one dashboard), which needs per-site address rewriting.
@@ -394,14 +395,43 @@ Not part of the demo; to be designed once a client is signed.
 - Non-web protocols (SSH, RDP, databases).
 - Longer or customer-specific log retention for compliance (ISO 27001, SOC 2).
 
-## 16. Open items
+## 16. Hiding the internal site from the gateway (proposed)
+
+**Not built.** This is the design for a later version; today the gateway dials the internal site, as section 5 describes. The goal is a gateway whose compromise - even by an attacker who gets root on it - does not reveal where the internal application lives, and does not open any more of it than a live grant already allows.
+
+### 16.1 Why the address cannot simply be hidden
+- The gateway opens the connection, so it has to hold an address it can route to. `UPSTREAM_URL` sits in the service environment (section 11), and root reads it there.
+- Taking it out of the configuration only moves it. Root on the gateway can recover the destination from the live socket (`ss -tnp`, `/proc/net/tcp`), from connection tracking, from the resolver cache, from the `SNI` on the outgoing TLS handshake, or from the process's own memory.
+- Three places hand it over more directly still, and are worth tightening whatever else is decided: the startup log line, `show-config`, and the admin dashboard, which prints the upstream address on screen.
+- So any address the gateway dials is recoverable by whoever owns the gateway. "The gateway does not know the address" can only be true of a gateway that never dials.
+
+### 16.2 Inverting the connection
+- A **connector** runs inside the customer's network, beside the internal site. It dials *outbound* to the gateway over TLS and holds a long-lived multiplexed stream open. This is the connector already listed in section 15, used here as a containment control and not only to avoid inbound firewall rules.
+- The gateway then holds no upstream address at all. `UPSTREAM_URL` leaves its configuration, and the proxy writes each vendor request into a stream that is already open instead of dialling one.
+- The proxy rules in section 6.6 do not change. Only the transport moves, so the allowlist check, the header stripping and the body rewriting all keep working against a fixed placeholder host.
+- What root on the gateway learns instead is the peer address of a socket the gateway accepted: the customer's outbound (NAT) address, not the internal site's. Nothing listens for inbound connections there, so it is not a route in.
+- A stronger variant terminates the stream on a third party - a tunnel service, `PrivateLink`, or a queue - leaving the gateway with only the broker's address. That is an extra dependency for a small gain over the connector, and is not recommended.
+
+### 16.3 The connector enforces the rules too
+- This is the part that carries the weight. An attacker with root on the gateway does not need the address: the open stream is already a live, authenticated channel into the internal site.
+- The connector therefore holds **its own copy of the policy** - the allowed path prefixes, the method allowlist and the grant deadlines - and checks every request on its own side before it fetches anything. A fully compromised gateway can then still only pull the handful of paths that some live grant already allows, and cannot reach `/admin` or an internal API at all.
+- This is the same principle as section 6.5: the rule is enforced where the party being restrained cannot edit it, and it is enforced on every request rather than once at the start.
+- The connector authenticates to the gateway with a client certificate held only on the customer's side. The gateway holds a CA certificate or a public-key pin, never a credential that would let it originate a connection inward.
+
+### 16.4 What this still does not do
+- The proxied pages identify the application by themselves: titles, branding, internal host names written into the HTML. A compromised gateway reads the responses as they pass, so it can learn *what* the application is even when it cannot learn where it is. `BLOCKED_LINKS=remove` and the rewriting in section 6.6 reduce this; they do not end it.
+- The customer's outbound address is still visible on the gateway. It is not a way in, but on a small network it may be enough to identify the customer.
+- The connector is a new component inside the customer's network, which is where it has to be to work, and so becomes one more thing to patch and monitor there.
+- It is a real architecture change: a new process, a stream protocol, the policy check duplicated on the connector side, and certificates to manage at both ends. It is larger than anything left in section 13, which is why it is written down here rather than built.
+
+## 17. Open items
 
 1. **Link and password in the same email.** Anyone who reads that one email gets in. Options to brainstorm: send the password over a second channel (SMS or WhatsApp), or email a one-time code at login. Accepted for the demo only.
 2. **Per-site restrictions.** Which actions the vendor may take on each allowed page depends on the target site. Default for now: read-only (`GET`, `HEAD`).
 3. **Exact allowed-page list** for the mock dashboard and, later, for a real client.
-4. **Deployment model** for clients (shared vs separate) and the connector approach.
+4. **Deployment model** for clients (shared vs separate) and the connector approach (section 16).
 
-## 17. Known limitations
+## 18. Known limitations
 
 - The gateway keeps vendors **off the network** but does not stop them from copying, screenshotting or saving anything on pages they are allowed to see. This is by design.
 - Some web apps break behind a proxy (absolute URLs, scripts that build links, websockets). Sub-pages of one dashboard are the easy case; unusual apps may need extra rewriting.
@@ -409,3 +439,4 @@ Not part of the demo; to be designed once a client is signed.
 - If the admin account is compromised, grants can be issued. TOTP and the master-password step-up reduce, but do not remove, this risk.
 - Single admin means no separation of duties and a single point of failure for revoking access.
 - Mail retries, but only a few times and only in memory. A gateway restarted part-way through a retry forgets the invite, and a vendor whose address is simply wrong will never receive one however many attempts are made; both cases still end with the dashboard flag and the admin pressing **Resend**.
+- The gateway holds the internal site's address, so an attacker with root on the gateway can recover it even though no vendor can. Section 16 is the design that removes it, and is not built.

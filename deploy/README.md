@@ -197,7 +197,7 @@ Then walk the demo script in section 12 of the main README, or run
 - **Backups**: the audit log is the record of who saw what. Back up the database
   if the retention period matters to the customer.
 - **Patching**: the gateway is internet-facing and bridges to the internal site
-  (section 17). Keep the instance and the Python dependencies updated.
+  (section 18). Keep the instance and the Python dependencies updated.
 - **`/admin` exposure**: still on the same hostname as the vendor routes. Section
   6.4 flags restricting it by IP or moving it to its own hostname as the next
   step past a pitch.
