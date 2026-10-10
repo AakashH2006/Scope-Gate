@@ -95,6 +95,9 @@ class Settings:
     smtp_user: str = ""
     smtp_password: str = ""
     mail_from: str = ""
+    # Attempts in total, not retries on top of the first try: 1 disables retrying.
+    mail_retry_attempts: int = 3
+    mail_retry_backoff_seconds: int = 5
 
     # --- runtime flags --------------------------------------------------------
     secure_cookies: bool = True          # False only for plain-HTTP local runs
@@ -148,6 +151,9 @@ def build_settings() -> Settings:
         smtp_user=os.getenv("SMTP_USER", ""),
         smtp_password=os.getenv("SMTP_PASSWORD", ""),
         mail_from=os.getenv("MAIL_FROM", os.getenv("SMTP_USER", "scopegate@localhost")),
+        # Floored at 1: a zero or negative setting would send nothing at all.
+        mail_retry_attempts=max(1, _int("MAIL_RETRY_ATTEMPTS", 3)),
+        mail_retry_backoff_seconds=max(0, _int("MAIL_RETRY_BACKOFF_SECONDS", 5)),
         secure_cookies=_bool("SECURE_COOKIES", not os.getenv("PUBLIC_URL", "").startswith("http://")),
         trust_forwarded_for=_bool("TRUST_FORWARDED_FOR", True),
     )

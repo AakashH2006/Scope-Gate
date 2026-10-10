@@ -268,7 +268,8 @@ Unknown, expired or revoked tokens all return the same neutral "link not valid" 
 - Settings are loaded from environment variables or a `mail.env` file readable only by its owner (same approach as the existing `access/mail.py` in the dvr-forensics-toolkit repo, which can be adapted).
 - The vendor email contains: the link, the password, the link-expiry time, the access duration, and a short plain-language note. No tracking pixels, no external images.
 - The admin is told on the dashboard if sending fails (`email_failed`).
-- **Resend.** Only the hashes of the link and password are kept, so a failed send cannot be repeated - it can only be replaced. A `pending` grant has a **Resend** button that mints a new link and password, invalidates the old ones and emails the vendor again, logging `invite_resent`. It needs the master password, because it issues a working credential. There is no automatic retry: one send is attempted, and a failure is the admin's to notice and resend.
+- **Resend.** Only the hashes of the link and password are kept, so a failed send cannot be repeated - it can only be replaced. A `pending` grant has a **Resend** button that mints a new link and password, invalidates the old ones and emails the vendor again, logging `invite_resent`. It needs the master password, because it issues a working credential.
+- **Automatic retry.** A failed send is retried on the same worker thread, `MAIL_RETRY_ATTEMPTS` times in total (3 by default) with the gap doubling from `MAIL_RETRY_BACKOFF_SECONDS` (5s, then 10s), because the usual causes - a rate limit, a mail server restarting - clear on their own given a little longer. Only the final outcome is logged, so one invite nobody received is one `email_failed` row rather than three, and the dashboard count stays a count of vendors left waiting. The retried message is held in memory on that thread and nowhere else: it contains a live vendor password, so a queue on disk or in the database would put a working credential at rest. The cost is that a restart part-way through forgets the invite, which is what **Resend** is for.
 - **Open item:** the link and password travel in the same email. This is accepted for the demo and flagged for later (see section 16).
 
 ## 10. Logging and retention
@@ -297,6 +298,8 @@ All via environment variables (names are suggestions):
 | `LOG_DASHBOARD_DAYS` | 7 | Days shown on dashboard |
 | `LOG_RETENTION_DAYS` | 365 | Days kept in the backend |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `MAIL_FROM` | - | Email settings |
+| `MAIL_RETRY_ATTEMPTS` | 3 | Send attempts in total; `1` disables retrying |
+| `MAIL_RETRY_BACKOFF_SECONDS` | 5 | First gap between attempts; it doubles |
 
 The `UPSTREAM_URL` setting is deliberate: the demo points it at the mock site, and a real client site can replace it later without changing the gateway.
 
@@ -368,6 +371,9 @@ It exists to show the gateway letting some pages through and refusing others.
 - [ ] Resending is refused once the vendor has signed in, once the link window has
   closed, and for a final grant
 - [ ] Resending needs the master password and a CSRF token
+- [ ] A send that fails once is retried and then reported as sent, once
+- [ ] A send that keeps failing logs exactly one email_failed, not one per attempt
+- [ ] Shutting down while a retry is waiting does not hold the process open
 - [ ] Admin login without TOTP fails
 - [ ] Logs show 7 days on the dashboard and 1 year is kept in the database
 - [ ] No tokens, passwords or session ids appear in any log
@@ -402,4 +408,4 @@ Not part of the demo; to be designed once a client is signed.
 - The gateway is a high-value target (it is internet-facing and bridges to the internal site). It needs regular patching, rate limiting, and monitoring.
 - If the admin account is compromised, grants can be issued. TOTP and the master-password step-up reduce, but do not remove, this risk.
 - Single admin means no separation of duties and a single point of failure for revoking access.
-- Mail is one attempt with no automatic retry. A failure is visible on the dashboard and in the log, and the admin resends; nothing chases it on its own.
+- Mail retries, but only a few times and only in memory. A gateway restarted part-way through a retry forgets the invite, and a vendor whose address is simply wrong will never receive one however many attempts are made; both cases still end with the dashboard flag and the admin pressing **Resend**.

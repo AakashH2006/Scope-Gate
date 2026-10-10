@@ -72,6 +72,8 @@ def settings(tmp_path: Path) -> Settings:
         mail_backend="file",
         mail_outbox_dir=(tmp_path / "outbox").as_posix(),
         mail_from="gateway@company.example",
+        mail_retry_attempts=3,
+        mail_retry_backoff_seconds=0,  # no test should ever wait out a retry gap
         secure_cookies=False,
         trust_forwarded_for=False,
     )

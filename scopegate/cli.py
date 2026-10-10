@@ -171,6 +171,8 @@ def _show_config(settings: Settings) -> None:
         print("MAIL_FROM         ", settings.mail_from or "(not set)")
     else:
         print("MAIL_OUTBOX_DIR   ", settings.mail_outbox_dir)
+    print("MAIL_RETRY        ", f"{settings.mail_retry_attempts} attempts, "
+          f"first gap {settings.mail_retry_backoff_seconds}s")
     print("LOG_DASHBOARD_DAYS", settings.log_dashboard_days)
     print("LOG_RETENTION_DAYS", settings.log_retention_days)
     print("SECURE_COOKIES    ", settings.secure_cookies)

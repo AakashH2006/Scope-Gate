@@ -105,6 +105,10 @@ def create_app(
         finally:
             await app.state.worker.stop()
             await app.state.live.close_all()
+            # Short wait on purpose: it only has to let a thread out of a retry
+            # gap.  The threads are daemons, so an attempt still on the wire
+            # cannot hold the process open.
+            app.state.mailer.close(timeout=2.0)
             if upstream_client is None:
                 await app.state.upstream.aclose()
             await dispose_engine()

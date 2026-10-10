@@ -10,6 +10,13 @@ Three backends, chosen with ``MAIL_BACKEND``:
 Sending always happens on a worker thread: a slow mail server must never hold up
 a request.  The result comes back through a callback that writes the
 ``email_sent`` / ``email_failed`` audit event.
+
+A failed send is retried on that same thread, up to ``MAIL_RETRY_ATTEMPTS``
+times with a doubling gap, and only the final outcome is reported -- one audit
+row per invite, whatever happened in between.  The retry deliberately keeps the
+rendered message in memory and nowhere else: it holds the vendor's password, so
+a durable queue would put a live credential at rest.  The cost is that a restart
+mid-retry forgets the invite, which is what the admin's Resend button is for.
 """
 from __future__ import annotations
 
@@ -160,6 +167,8 @@ class Mailer:
         self.settings = settings
         self.backend = settings.mail_backend
         self._threads: list[threading.Thread] = []
+        # Set at shutdown so a thread waiting out a retry gap stops waiting.
+        self._shutdown = threading.Event()
 
     # -- public API ------------------------------------------------------------
 
@@ -176,24 +185,61 @@ class Mailer:
         thread.start()
 
     def send_invite_blocking(self, invite: VendorInvite) -> tuple[bool, str]:
-        """Same send, inline.  Used by the tests and the CLI."""
+        """Same send, inline, retries included.  Used by the tests and the CLI."""
         msg = render_invite(invite)
         msg["From"] = self.settings.mail_from or "scopegate@localhost"
-        return self._send(msg)
+        return self._send_with_retries(msg)
 
     def join(self, timeout: float = 10.0) -> None:
+        """Wait for sends in flight without cutting their retries short."""
         for thread in list(self._threads):
             thread.join(timeout)
         self._threads = [t for t in self._threads if t.is_alive()]
 
+    def close(self, timeout: float = 10.0) -> None:
+        """Abandon pending retries and wait for the threads to notice."""
+        self._shutdown.set()
+        self.join(timeout)
+
     # -- internals -------------------------------------------------------------
 
     def _send_and_report(self, msg: EmailMessage, on_done: SendCallback) -> None:
-        ok, detail = self._send(msg)
+        ok, detail = self._send_with_retries(msg)
         try:
             on_done(ok, detail)
         except Exception:  # pragma: no cover -- never let the thread die loudly
             log.exception("mail callback failed")
+
+    def _send_with_retries(self, msg: EmailMessage) -> tuple[bool, str]:
+        """Attempt the send until it works or the attempts run out.
+
+        Reports once, so the dashboard's mail-failure count stays a count of
+        invites nobody received rather than of attempts.  The gap doubles
+        because the usual causes (a rate limit, a mail server restarting) clear
+        on their own given a little more time.
+        """
+        attempts = max(1, self.settings.mail_retry_attempts)
+        for attempt in range(1, attempts + 1):
+            ok, detail = self._send(msg)
+            if ok:
+                if attempt > 1:
+                    return True, f"{detail} (attempt {attempt} of {attempts})"
+                return True, detail
+            if attempt == attempts:
+                if attempts == 1:
+                    return False, detail
+                return False, f"{detail} (gave up after {attempts} attempts)"
+            delay = self.settings.mail_retry_backoff_seconds * 2 ** (attempt - 1)
+            log.warning(
+                "mail attempt %d of %d failed, retrying in %ds: %s",
+                attempt,
+                attempts,
+                delay,
+                detail,
+            )
+            if self._shutdown.wait(delay):
+                return False, f"{detail} (attempt {attempt} of {attempts}, shutting down)"
+        raise AssertionError("unreachable")  # pragma: no cover
 
     def _send(self, msg: EmailMessage) -> tuple[bool, str]:
         try:

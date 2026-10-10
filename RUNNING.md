@@ -6,7 +6,7 @@ The plan is in [README.md](README.md). This is how to run what has been built.
 scopegate/           the gateway: auth, grants, proxy, expiry, audit log
 mocksite/            the mock internal dashboard (the demo target)
 migrations/          Alembic revisions
-tests/               118 tests, including the checklist in section 14
+tests/               124 tests, including the checklist in section 14
 scripts/run_local.py start both servers for a local demo
 scripts/demo_run.py  drive the whole demo script headlessly, with pass/fail
 deploy/              Caddyfile, systemd units, deployment notes
@@ -42,7 +42,7 @@ the grant is created.
 ## Does it work?
 
 ```bash
-python -m pytest                 # 118 tests, ~80s
+python -m pytest                 # 124 tests, ~85s
 python -m pytest -m "not integration"   # skip the ones that need real sockets
 python scripts/demo_run.py       # the 10-step demo script, 47 checks
 ```
@@ -95,7 +95,13 @@ An app password, not the account password, and 2FA must be on for the Google
 account. Moving to Amazon SES later is the same block with a different host.
 
 Sending happens on a worker thread, so a slow server never holds up a request.
-Failures land on the dashboard and in the log as `email_failed`.
+A failure is retried on that thread -- `MAIL_RETRY_ATTEMPTS` attempts in total
+(3), with the gap doubling from `MAIL_RETRY_BACKOFF_SECONDS` (5s, then 10s) --
+and only the final outcome is recorded, so one invite that never arrived is one
+`email_failed` on the dashboard rather than one per attempt. The message is kept
+in memory while it is retried and never written anywhere, because it holds the
+vendor's password; a restart part-way through therefore loses it, and the
+grant's **Resend** button is the way back.
 
 ## Pointing at a real internal site
 

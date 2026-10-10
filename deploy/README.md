@@ -166,9 +166,12 @@ and sends nothing:
 sudo -u scopegate .venv/bin/python -m scopegate.cli check-mail
 ```
 
-Then send one real invite to yourself before the demo. A failure writes an
-`email_failed` audit row and the dashboard flags it; the grant's **Resend**
-button issues a new link and password once the cause is fixed.
+Then send one real invite to yourself before the demo. A failure is retried a
+few times first (`MAIL_RETRY_ATTEMPTS`, 3 by default, with a doubling gap); if
+every attempt fails it writes one `email_failed` audit row and the dashboard
+flags it, and the grant's **Resend** button issues a new link and password once
+the cause is fixed. Retries are held in memory, so restarting the service
+part-way through one abandons it.
 
 ## 6. Check it
 
