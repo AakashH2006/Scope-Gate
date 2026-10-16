@@ -18,8 +18,17 @@ Repo: https://github.com/AakashH2006/Scope-Gate (public)
 
 ## State
 
-- Build-plan steps 1–9 and 11 done. **Step 10 (AWS deployment) has never been
-  run** — everything in `deploy/` is reviewed-but-untested config.
+- All build-plan steps done. Step 10 was executed on 2026-10-16: the demo is
+  live at **https://scopegate.duckdns.org** on one EC2 instance in
+  `eu-north-1` (`i-0c4c2ee60dda5b5a0`, Elastic IP 16.192.118.100, Ubuntu
+  24.04, Caddy terminating TLS, SQLite on the instance).
+- **The instance is stopped between demos** to save the credit; the Elastic
+  IP bills either way. Start it from the EC2 console. Shell in with
+  `ssh -i scopegate.pem ubuntu@16.192.118.100` — port 22 is open only to the
+  home IP that launched it, so re-add that rule when the address changes.
+  CloudShell is refused on this account whatever its error says; don't retry
+  it. The admin login and `MAIL_FROM` are both the project mailbox — the
+  address is not written down here, because this file is public.
 - CI runs lint, the 124 tests, the demo script and an `alembic check` on
   3.12 and 3.13, plus a job that fails if a secret file is ever tracked.
 - 124 tests pass (`python -m pytest`). `python scripts/demo_run.py` walks the
@@ -77,18 +86,13 @@ Repo: https://github.com/AakashH2006/Scope-Gate (public)
    next piece of architecture, and the answer to "what if ScopeGate itself is
    compromised". Bigger than it sounds: new process, stream protocol, the
    policy check duplicated connector-side, certificates at both ends.
-2. **AWS deployment — the only unfinished build step, and secondary.**
-   `deploy/` is written but has never been executed. Needs the AWS CLI
-   installed and `aws configure` run *by the user*; it takes access keys Claude
-   should not handle. Traps: EC2 blocks outbound port 25, so use 587; SES
-   starts in sandbox and silently delivers only to **verified** addresses;
-   Gmail needs an app password (not the account password) and rewrites `From`
-   to match `SMTP_USER`.
-3. **Single process.** Admin sessions, the login rate limiter and the expiry
+2. **Single process.** Admin sessions, the login rate limiter and the expiry
    job are all in memory, so a second uvicorn worker breaks all three. Fine for
    a demo; the first thing to fix if anyone asks about load.
-4. Smaller: no LICENSE (a public repo without one is all rights reserved); one
+3. Smaller: no LICENSE (a public repo without one is all rights reserved); one
    admin with no roles; `/admin` shares a hostname with the vendor routes.
+4. Untested on the live host: nobody has created a grant and watched the
+   invite arrive. `cli check-mail` proves the SMTP login, not delivery.
 
 ## Open questions, not yet decided
 
