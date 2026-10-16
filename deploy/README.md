@@ -15,6 +15,8 @@ CLI for a single instance.
 ## 0. The instance and the way in
 
 1. **EC2 -> Launch instance.** Ubuntu 24.04 LTS, `t3.micro`, 20 GB gp3.
+   The Ubuntu tile tracks the newest LTS, so open the AMI dropdown and pick
+   24.04 by name -- a newer release ships a Python no CI job has run on.
 2. **Key pair:** create one, download the `.pem`, `chmod 400` it. It is the only
    way in; AWS will not show it again.
 3. **Security group** -- three inbound rules and nothing else:
@@ -63,13 +65,15 @@ sudo -u scopegate .venv/bin/pip install -r requirements.txt
 
 ```bash
 .venv/bin/python -m scopegate.cli keys         # prints SECRET_KEY and TOTP_ENC_KEY
-sudo install -m 600 -o root -g scopegate /dev/null /etc/scopegate/scopegate.env
+sudo install -m 640 -o root -g scopegate /dev/null /etc/scopegate/scopegate.env
 sudo nano /etc/scopegate/scopegate.env        # see .env.example for every key
 ```
 
-The file must stay `0600` and owned so that only the service user can read it
-(section 6.7). Set at minimum `PUBLIC_URL`, `SECRET_KEY`, `TOTP_ENC_KEY`,
-`DATABASE_URL`, `UPSTREAM_URL`, `ALLOWED_PAGES` and the SMTP block.
+The file must stay `0640` and owned so that only the service user can read it
+(section 6.7). `0600` would lock out `scopegate` itself, and every CLI
+command below runs as that user. Set at minimum `PUBLIC_URL`, `SECRET_KEY`,
+`TOTP_ENC_KEY`, `DATABASE_URL`, `UPSTREAM_URL`, `ALLOWED_PAGES` and the SMTP
+block.
 
 The gateway **refuses to start** when `PUBLIC_URL` is not a local address and
 any of `SECRET_KEY`, `TOTP_ENC_KEY` or an `https://` `PUBLIC_URL` is missing
@@ -99,13 +103,22 @@ DATABASE_URL=postgresql+asyncpg://scopegate:PASSWORD@your-db.rds.amazonaws.com:5
 Then create the schema and the admin account:
 
 ```bash
+# Give the shell the environment systemd gives the service.  `EnvironmentFile=`
+# belongs to the unit, not to your shell, so a bare `cli init-db` reads none of
+# it and quietly builds the schema in ./scopegate.db instead of at DATABASE_URL
+# -- leaving the service pointed at an empty database that still answers
+# /healthz.  Stay in this shell for the rest of the section.
+sudo -u scopegate -s
+set -a; . /etc/scopegate/scopegate.env; set +a
+cd /opt/scopegate
+
 # fresh database -- creates the tables and stamps the Alembic revision
-sudo -u scopegate .venv/bin/python -m scopegate.cli init-db
+.venv/bin/python -m scopegate.cli init-db
 
 # on every later deploy, before restarting the service
-sudo -u scopegate .venv/bin/python -m scopegate.cli migrate
+.venv/bin/python -m scopegate.cli migrate
 
-sudo -u scopegate .venv/bin/python -m scopegate.cli create-admin --email you@company.example
+.venv/bin/python -m scopegate.cli create-admin --email you@company.example
 ```
 
 That prints the password and the authenticator provisioning URI **once**. Add it
@@ -163,7 +176,8 @@ Check the credentials before anything depends on them -- this connects, logs in
 and sends nothing:
 
 ```bash
-sudo -u scopegate .venv/bin/python -m scopegate.cli check-mail
+# in the environment-loaded shell from section 3
+.venv/bin/python -m scopegate.cli check-mail
 ```
 
 Then send one real invite to yourself before the demo. A failure is retried a
