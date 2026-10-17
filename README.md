@@ -6,9 +6,11 @@ A second, restricted gateway that lets an outside vendor use a few specific page
 
 > **Status:** planning document for a **demo build**. Everything marked *(later)* is intentionally out of scope for the demo and is listed again in [Future / client version](#15-future--client-version).
 >
-> **The demo is built.** See [RUNNING.md](RUNNING.md) to run it, and
-> [deploy/README.md](deploy/README.md) to deploy it. Build-plan steps 1-9 and 11
-> are done; step 10 is scripted but not yet run on real AWS infrastructure.
+> **The demo is built and deployed.** See [RUNNING.md](RUNNING.md) to run it,
+> and [deploy/README.md](deploy/README.md) to deploy it. Every build-plan step
+> is done, step 10 included: it runs on one EC2 instance with Caddy terminating
+> TLS and SQLite on the instance, and is stopped between demos rather than left
+> serving.
 > `python -m pytest` covers every box in [section 14](#14-test-checklist);
 > `python scripts/demo_run.py` walks the [section 12](#12-demo-setup) demo script
 > end to end.
